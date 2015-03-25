@@ -1,7 +1,7 @@
 mkdir -p build
 cd build
 
-sed s/c++0x/c++11/ < ../CMakeLists.txt > ../CMakeLists_new.txt 
+# sed s/c++0x/c++11/ < ../CMakeLists.txt > ../CMakeLists_new.txt 
 
 # export CC_PRINT_OPTIONS='YES'
 # export CC_PRINT_OPTIONS_FILE='../.CC_PRINT_OPTIONS'
