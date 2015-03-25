@@ -22,7 +22,7 @@ list(APPEND ieee802_15_4_sources
     access_code_prefixer.cc
     bc_connection.cc
     mac.cc
-    packet_sink.cc
+    oqpsk_packet_sink.cc
     rime_connection.cc
     rime_stack.cc
     ruc_connection.cc

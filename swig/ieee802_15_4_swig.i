@@ -23,7 +23,7 @@
 %{
 #include "ieee802_15_4/access_code_prefixer.h"
 #include "ieee802_15_4/mac.h"
-#include "ieee802_15_4/packet_sink.h"
+#include "ieee802_15_4/oqpsk_packet_sink.h"
 #include "ieee802_15_4/rime_stack.h"
 #include "ieee802_15_4/phr_prefixer.h"
 #include "ieee802_15_4/zeropadding_b.h"
@@ -52,13 +52,13 @@
 
 %include "ieee802_15_4/access_code_prefixer.h"
 %include "ieee802_15_4/mac.h"
-%include "ieee802_15_4/packet_sink.h"
+%include "ieee802_15_4/oqpsk_packet_sink.h"
 %include "ieee802_15_4/rime_stack.h"
 
 
 GR_SWIG_BLOCK_MAGIC2(ieee802_15_4, access_code_prefixer);
 GR_SWIG_BLOCK_MAGIC2(ieee802_15_4, mac);
-GR_SWIG_BLOCK_MAGIC2(ieee802_15_4, packet_sink);
+GR_SWIG_BLOCK_MAGIC2(ieee802_15_4, oqpsk_packet_sink);
 GR_SWIG_BLOCK_MAGIC2(ieee802_15_4, rime_stack);
 
 %include "ieee802_15_4/phr_prefixer.h"

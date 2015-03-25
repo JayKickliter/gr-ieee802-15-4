@@ -17,7 +17,7 @@ install(FILES
 	access_code_prefixer.h
 	api.h
 	mac.h
-	packet_sink.h
+	oqpsk_packet_sink.h
 	rime_stack.h
 	phr_prefixer.h
     zeropadding_b.h
