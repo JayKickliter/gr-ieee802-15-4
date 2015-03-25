@@ -17,30 +17,32 @@ install(FILES
 	access_code_prefixer.h
 	api.h
 	mac.h
+    bqpsk_packet_sink.h
 	oqpsk_packet_sink.h
-	rime_stack.h
 	phr_prefixer.h
-    zeropadding_b.h
-    codeword_mapper_bi.h
-    interleaver_ii.h
-    qpsk_mapper_if.h
-    dqpsk_mapper_ff.h
-    dqcsk_mapper_fc.h
-    preamble_sfd_prefixer_ii.h
-    dqcsk_demapper_cc.h
-    qpsk_demapper_fi.h
-    codeword_demapper_ib.h
-    zeropadding_removal_b.h
-    phr_removal.h
-    matched_filter_ff.h
-    chips_to_bits_fb.h
+	rime_stack.h
     access_code_removal_b.h
-    dqpsk_soft_demapper_cc.h
-    deinterleaver_ff.h
+    chips_to_bits_fb.h
+    codeword_demapper_ib.h
+    codeword_mapper_bi.h
     codeword_soft_demapper_fb.h
     costas_loop_cc.h
+    deinterleaver_ff.h
+    dqcsk_demapper_cc.h
+    dqcsk_mapper_fc.h
+    dqpsk_mapper_ff.h
+    dqpsk_soft_demapper_cc.h
     frame_buffer_cc.h
+    interleaver_ii.h
+    matched_filter_ff.h
     multiuser_chirp_detector_cc.h
-    preamble_tagger_cc.h DESTINATION ${GR_INCLUDE_DIR}/gnuradio/ieee802_15_4
+    phr_removal.h
+    preamble_sfd_prefixer_ii.h
+    preamble_tagger_cc.h 
+    qpsk_demapper_fi.h
+    qpsk_mapper_if.h
+    zeropadding_b.h
+    zeropadding_removal_b.h
+    DESTINATION ${GR_INCLUDE_DIR}/gnuradio/ieee802_15_4
 	COMPONENT "ieee802_15_4_devel"
 )
