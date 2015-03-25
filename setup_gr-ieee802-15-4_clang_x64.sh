@@ -57,5 +57,5 @@ cd build
 # set CPATH='/opt/local/include'
 # set LIBRARY_PATH='/opt/local/lib'
 # set MACOSX_DEPLOYMENT_TARGET='10.10'
-/usr/bin/make -j8 -w all VERBOSE=ON
+# /usr/bin/make -j8 -w all VERBOSE=ON
 # make -j2 VERBOSE=ON > m_j2_o.txt 2>&1
