@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include <ieee802_15_4/packet_sink.h>
+#include <ieee802_15_4/oqpsk_packet_sink.h>
 #include <gnuradio/io_signature.h>
 #include <cstdio>
 #include <errno.h>
@@ -61,7 +61,7 @@ static const unsigned int CHIP_MAPPING[] = {
 static const int MAX_PKT_LEN    = 128 -  1; // remove header and CRC
 static const int MAX_LQI_SAMPLES = 8; // Number of chip correlation samples to take
 
-class packet_sink_impl : public packet_sink {
+class oqpsk_packet_sink_impl : public oqpsk_packet_sink {
 public:
 
 void enter_search()
@@ -140,8 +140,8 @@ int slice(float x) {
 	return x > 0 ? 1 : 0;
 }
 
-packet_sink_impl(int threshold)
-  : block ("packet_sink",
+oqpsk_packet_sink_impl(int threshold)
+  : block ("oqpsk_packet_sink",
 		   gr::io_signature::make(1, 1, sizeof(float)),
 		   gr::io_signature::make(0, 0, 0)),
     d_threshold(threshold)
@@ -160,7 +160,7 @@ packet_sink_impl(int threshold)
 
 }
 
-~packet_sink_impl()
+~oqpsk_packet_sink_impl()
 {
 }
 
@@ -402,6 +402,6 @@ private:
 	char buf[256];
 };
 
-packet_sink::sptr packet_sink::make(unsigned int threshold) {
-	return gnuradio::get_initial_sptr(new packet_sink_impl(threshold));
+oqpsk_packet_sink::sptr oqpsk_packet_sink::make(unsigned int threshold) {
+	return gnuradio::get_initial_sptr(new oqpsk_packet_sink_impl(threshold));
 }
