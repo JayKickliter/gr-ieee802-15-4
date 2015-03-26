@@ -30,9 +30,9 @@
 using namespace gr::ieee802_15_4;
 
 // very verbose output for almost each sample
-#define VERBOSE 0
+#define VERBOSE 1
 // less verbose output for higher level debugging
-#define VERBOSE2 0
+#define VERBOSE2 1
 
 #define CHIPS_PER_SYMBOL 15
 
@@ -121,13 +121,11 @@ int slice(float x) {                                        // TODO: will we nee
 
 bpsk_packet_sink_impl(int threshold)
   : block ("bpsk_packet_sink",
-           gr::io_signature::make(1, 1, sizeof(float)),     // TODO: figure out what the input type should be
+           gr::io_signature::make(1, 1, sizeof(unsigned char)),
            gr::io_signature::make(0, 0, 0)),
-           d_threshold(threshold    )
+           d_threshold( threshold )
 {
     d_sync_vector      = 0xA7;
-
-    // Link Quality Information
     d_lqi              = 0;
     d_lqi_sample_count = 0;
 
@@ -190,7 +188,7 @@ int general_work(   int                         noutput,
                     }
                 } else {
                     // we found the first 0, thus we only have to do the calculation every CHIPS_PER_SYMBOL chips
-                    if(d_chip_cnt == 32){
+                    if(d_chip_cnt == 15){
                         d_chip_cnt = 0;
 
                         if(d_packet_byte == 0) {
@@ -200,7 +198,7 @@ int general_work(   int                         noutput,
                                 // we found an other 0 in the chip sequence
                                 d_packet_byte = 0;
                                 d_preamble_cnt ++;
-                            } else if (gr::blocks::count_bits16((d_shift_reg & 0x7FFE) ^ (CHIP_MAPPING[7] & 0xFFFFFFFE)) <= d_threshold) {
+                            } else if (gr::blocks::count_bits16((d_shift_reg & 0x7FFE) ^ (CHIP_MAPPING[1] & 0xFFFE)) <= d_threshold) {  // TODO: why index 7?
                                 if (VERBOSE2)
                                     fprintf(stderr,"Found first SFD\n"),fflush(stderr);
                                 d_packet_byte = 7 << 4;
@@ -213,7 +211,7 @@ int general_work(   int                         noutput,
                             }
 
                         } else {
-                            if (gr::blocks::count_bits16((d_shift_reg & 0x7FFE) ^ (CHIP_MAPPING[10] & 0xFFFFFFFE)) <= d_threshold) {
+                            if (gr::blocks::count_bits16((d_shift_reg & 0x7FFE) ^ (CHIP_MAPPING[1] & 0xFFFE)) <= d_threshold) {
                                 d_packet_byte |= 0xA;
                                 if (VERBOSE2)
                                     fprintf(stderr,"Found sync, 0x%x\n", d_packet_byte),fflush(stderr);
@@ -283,7 +281,7 @@ int general_work(   int                         noutput,
             if (VERBOSE2)
                 fprintf(stderr,"Packet Build count=%d, ninput=%d, packet_len=%d\n", count, ninput, d_packetlen),fflush(stderr);
 
-            while (count < ninput) {   // shift bits into bytes of packet one at a time
+            while (count < ninput) {                       // shift bits into bytes of packet one at a time
                 if(slice(inbuf[count++]))
                     d_shift_reg = (d_shift_reg << 1) | 1;
                 else
@@ -293,25 +291,23 @@ int general_work(   int                         noutput,
 
                 if(d_chip_cnt == 0){
                     unsigned char c = decode_chips(d_shift_reg);
-                    if(c == 0xff){
-                        // something is wrong. restart the search for a sync
+                    if(c == 0xff){                         // something is wrong. restart the search for a sync
                         if(VERBOSE2)
                             fprintf(stderr, "Found a not valid chip sequence! %u\n", d_shift_reg), fflush(stderr);
 
                         enter_search();
                         break;
                     }
-                    // the first symbol represents the first part of the byte.
-                    if(d_packet_byte_index == 0){
+                                                          
+                    if(d_packet_byte_index == 0){          // the first symbol represents the first part of the byte.
                         d_packet_byte = c;
                     } else {
-                        // c is always < 15
-                        d_packet_byte |= c << 4;
+                        d_packet_byte |= c << 4;           // c is always < 15
                     }
-                    //fprintf(stderr, "%d: 0x%x\n", d_packet_byte_index, c);
+                                                           // fprintf(stderr, "%d: 0x%x\n", d_packet_byte_index, c);
                     d_packet_byte_index = d_packet_byte_index + 1;
                     if(d_packet_byte_index%2 == 0){
-                        // we have a complete byte
+                                                           // we have a complete byte
                         if (VERBOSE2)
                             fprintf(stderr, "packetcnt: %d, payloadcnt: %d, payload 0x%x, d_packet_byte_index: %d\n", d_packetlen_cnt, d_payload_cnt, d_packet_byte, d_packet_byte_index), fflush(stderr);
 
@@ -319,7 +315,7 @@ int general_work(   int                         noutput,
                         d_payload_cnt++;
                         d_packet_byte_index         = 0;
 
-                        if (d_payload_cnt >= d_packetlen){  // packet is filled, including CRC. might do check later in here
+                        if (d_payload_cnt >= d_packetlen){ // packet is filled, including CRC. might do check later in here
                             unsigned int scaled_lqi = (d_lqi / MAX_LQI_SAMPLES) << 3;
                             unsigned char lqi       = (scaled_lqi >= 256? 255 : scaled_lqi);
 
@@ -340,6 +336,7 @@ int general_work(   int                         noutput,
                     }
                 }
             }
+
             break;
 
         default:

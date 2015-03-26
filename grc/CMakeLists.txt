@@ -17,6 +17,7 @@ install(FILES
     ieee802_15_4_access_code_prefixer.xml
     ieee802_15_4_mac.xml
     ieee802_15_4_oqpsk_packet_sink.xml
+    ieee802_15_4_bpsk_packet_sink.xml
     ieee802_15_4_rime_stack.xml
     ieee802_15_4_phr_prefixer.xml
     ieee802_15_4_zeropadding_b.xml

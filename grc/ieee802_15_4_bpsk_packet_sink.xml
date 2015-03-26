@@ -15,7 +15,7 @@
 
 	<sink>
 		<name>in</name>
-		<type>float</type>
+		<type>byte</type>
 		<nports>1</nports>
 	</sink>
 	<source>
