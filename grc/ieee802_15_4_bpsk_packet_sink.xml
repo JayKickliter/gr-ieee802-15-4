@@ -1,10 +1,10 @@
 <?xml version="1.0"?>
 <block>
-	<name>OQPSK Packet Sink</name>
-	<key>ieee802_15_4_oqpsk_packet_sink</key>
+	<name>BPSK Packet Sink</name>
+	<key>ieee802_15_4_bpsk_packet_sink</key>
 	<category>IEEE802.15.4</category>
 	<import>import ieee802_15_4</import>
-	<make>ieee802_15_4.oqpsk_packet_sink($th)</make>
+	<make>ieee802_15_4.bpsk_packet_sink($th)</make>
 
 	<param>
 		<name>Threshold</name>

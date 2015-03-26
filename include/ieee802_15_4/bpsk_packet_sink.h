@@ -1,5 +1,5 @@
 /*
- * Copyright 2004,2013 Free Software Foundation, Inc.
+ * Copyright (C) 2013 Bastian Bloessl <bloessl@ccs-labs.org>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -14,14 +14,25 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include <ieee802_15_4/bqpsk_packet_sink.h>
-#include <gnuradio/io_signature.h>
-#include <cstdio>
-#include <errno.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <stdexcept>
-#include <cstring>
-#include <gnuradio/blocks/count_bits.h>
-#include <iostream>
+#ifndef INCLUDED_GR_IEEE802_15_4_bpsk_packet_sink_H
+#define INCLUDED_GR_IEEE802_15_4_bpsk_packet_sink_H
+
+#include <ieee802_15_4/api.h>
+#include <gnuradio/block.h>
+
+namespace gr {
+namespace ieee802_15_4 {
+
+class IEEE802_15_4_API bpsk_packet_sink : virtual public block
+{
+public:
+
+	typedef boost::shared_ptr<bpsk_packet_sink> sptr;
+	static sptr make(unsigned int threshold = 10);
+
+};
+
+}  // namespace ieee802_15_4
+}  // namespace gr
+
+#endif /* INCLUDED_GR_IEEE802_15_4_bpsk_packet_sink_H */

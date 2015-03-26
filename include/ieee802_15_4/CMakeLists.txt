@@ -16,7 +16,7 @@
 install(FILES   access_code_prefixer.h
                 api.h
                 mac.h
-                bqpsk_packet_sink.h
+                bpsk_packet_sink.h
                 oqpsk_packet_sink.h
                 phr_prefixer.h
                 rime_stack.h

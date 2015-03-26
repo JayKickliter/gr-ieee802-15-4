@@ -22,6 +22,7 @@ list(APPEND ieee802_15_4_sources
 		    access_code_prefixer.cc
 		    access_code_removal_b_impl.cc
 		    bc_connection.cc
+            bpsk_packet_sink.cc
 		    chips_to_bits_fb_impl.cc
 		    codeword_demapper_ib_impl.cc
 		    codeword_mapper_bi_impl.cc
