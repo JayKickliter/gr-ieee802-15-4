@@ -8,6 +8,8 @@ export  PacketSink,
         Modulation,
         BPSK,
         OQPSK,
+        spread,
+        CHIP_MAP_BPSK,
         exec
 
 
@@ -219,12 +221,6 @@ function exec( sink::PacketSink, input::Vector )
     end
 end
 
-
-
-
-
-
-
 type PacketSource
     modulation        # BPSK, OQPSK, etc
     chips_per_symbol  # how many chips per demodulated symbol. 15 For BPSK, 32 for OQPSK
@@ -235,6 +231,42 @@ function PacketSource( ::Type{BPSK} )
     PacketSource( BPSK, 15, CHIP_MAP_BPSK )
 end
 
+
+function spread( chip_map::AbstractVector, chips_per_symbol::Integer, packet::AbstractVector{Uint8}; diff_enc = false )
+    
+    packet_len        = length( packet )
+    frame_len         = packet_len * 8 * chips_per_symbol
+    frame             = zeros( Uint8, frame_len )
+    last_diff_enc_bit = 0
+    frame_idx         = 0
+    
+    for packet_idx in 0:packet_len-1
+        packet_byte = packet[packet_idx+1]
+
+        for bit_idx in 0:7
+            packet_bit = (packet_byte >> bit_idx) & 0x01
+
+            if diff_enc
+                packet_bit        = packet_bit $ last_diff_enc_bit
+                last_diff_enc_bit = packet_bit
+            end
+
+            chips = chip_map[packet_bit+1]
+            
+            for chip_idx in 0:chips_per_symbol-1
+                frame[frame_idx+1] = (chips >> chip_idx) & 0x01
+                frame_idx       += 1 
+            end
+            
+        end
+    end
+    
+    
+    return frame    
+end
+
+
+
 function exec( source::PacketSource, input::Vector )
     payload_len = length( input )
     packet_len  = payload_len + 6
@@ -243,32 +275,8 @@ function exec( source::PacketSource, input::Vector )
     packet[6]   = payload_len & 0b0111111
     packet[7:end] = input
     
-    frame_len         = packet_len * 8 * source.chips_per_symbol
-    frame             = zeros( Uint8, frame_len )
-    last_diff_enc_bit = 0
+    spread( CHIP_MAP_BPSK, source.chips_per_symbol, packet, diff_enc = true )
     
-    frame_idx      = 0
-
-    for packet_idx in 0:packet_len-1
-        packet_byte = packet[packet_idx+1]
-
-        for bit_idx in 0:7
-
-            packet_bit        = (packet_byte >> bit_idx) & 0x01
-            diff_enc_bit      = packet_bit $ last_diff_enc_bit
-            chips             = source.chip_map[diff_enc_bit+1]
-            last_diff_enc_bit = diff_enc_bit
-            
-            for chip_idx in 0:source.chips_per_symbol-1
-                # println((packet_idx,bit_idx,chip_idx,frame_idx))
-                frame[frame_idx+1] = (chips >> chip_idx) & 0x01
-                frame_idx       += 1 
-            end
-            
-        end
-    end
-    
-    return frame
 end
 
 
@@ -277,8 +285,6 @@ end # module PacketSink
 
 
 using ieee802_15_4
-
-
 
 source    = PacketSource( BPSK )
 tx_packet = exec( source, [ 0xDE, 0xAD, 0xFE, 0xED])
