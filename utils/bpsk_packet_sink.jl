@@ -14,7 +14,8 @@ export  PacketSink,
 
 
 abstract SyncState
-type SyncSearch <: SyncState end
+type SyncOnZero     <: SyncState end
+type SFDSearch      <: SyncState end
 type HeaderSearch   <: SyncState end
 type PayloadCollect <: SyncState end
 
@@ -23,9 +24,6 @@ abstract Modulation
 type BPSK <: Modulation end
 type OQPSK <: Modulation end
 
-const STATE_SYNC_SEARCH = 0
-const STATE_HAVE_SYNC   = 1
-const STATE_HAVE_HEADER = 2
 const MAX_PKT_LEN       = 127
 const CHIP_MAP_BPSK     = Uint16[ 0b000100110101111, 0b111011001010000 ]
 const CHIP_MASK_BPSK    = 0b0011111111111110
@@ -55,7 +53,7 @@ end
 
 function PacketSink( modType, threshold )
     modulation        = BPSK
-    state             = SyncSearch
+    state             = SyncOnZero
     chips_per_symbol  = 15
     chip_map          = CHIP_MAP_BPSK
     sync_sequence     = 0x00e5
@@ -104,9 +102,9 @@ function demap_chips( sink::PacketSink, chips::Integer )
 end
 
 
-function set_state( sink::PacketSink, ::Type{SyncSearch} )
-    println( sink.state, " -> SyncSearch" )
-    sink.state            = STATE_SYNC_SEARCH
+function set_state( sink::PacketSink, ::Type{SyncOnZero} )
+    println( sink.state, " -> SyncOnZero" )
+    sink.state            = SyncOnZero
     sink.last_diff_enc_bit = 0
     sink.sync_shift_reg   = zero( Uint16 )
     sink.sync_shift_count = 0
@@ -115,10 +113,21 @@ function set_state( sink::PacketSink, ::Type{SyncSearch} )
     sink.packet_byte      = 0
 end
 
+function set_state( sink::PacketSink, ::Type{SFDSearch} )
+    println( sink.state, " -> SFDSearch" )
+    sink.state            = SFDSearch
+    sink.last_diff_enc_bit = 0
+    # sink.sync_shift_reg   = zero( Uint16 )
+    # sink.sync_shift_count = 0
+    sink.chip_shift_reg   = zero( Uint16 )
+    sink.chip_shift_count = 0
+    sink.packet_byte      = 0
+end
+
 function set_state( sink::PacketSink, ::Type{HeaderSearch} )
     println( sink.state, " -> HeaderSearch" )
-    sink.state           = STATE_HAVE_SYNC
-    sink.packet_byte     = 0
+    sink.state             = HeaderSearch
+    sink.packet_byte       = 0
     sink.packet_byte_count = 0
 end
 
@@ -131,12 +140,12 @@ function set_state( sink::PacketSink, ::Type{PayloadCollect} )
     sink.packet_byte_count = 0
 end
 
-function syncsearch( sink::PacketSink, input::Vector )
+function synconzero( sink::PacketSink, input::Vector )
     while sink.input_idx <= length( input )
 
         # Shift chips into the register, to look for first zero
         sink.chip_shift_reg    = uint16( (sink.chip_shift_reg >> 1) | ((input[sink.input_idx] & 1)<<14) )
-        @printf( "syncsearch. input_idx: %d, chip_shift_reg: %s, chip_shift_count: %d, sync_shift_reg: %s sync_shift_count: %d\n", sink.input_idx, bin(sink.chip_shift_reg, 15),sink.chip_shift_count, hex(sink.sync_shift_reg,4), sink.sync_shift_count )        
+        @printf( "SyncOnZero. input_idx: %d, chip_shift_reg: %s, chip_shift_count: %d, sync_shift_reg: %s sync_shift_count: %d\n", sink.input_idx, bin(sink.chip_shift_reg, 15),sink.chip_shift_count, hex(sink.sync_shift_reg,4), sink.sync_shift_count )
         sink.input_idx        += 1
         sink.chip_shift_count += 1
 
@@ -149,53 +158,61 @@ function syncsearch( sink::PacketSink, input::Vector )
         # Have not yet shifted first bit into sync_shift_reg
         if sink.sync_shift_count == 0
             (is_valid_seq, diff_enc_bit) = demap_chips( sink, sink.chip_shift_reg )
-            diff_dec_bit                 = diff_enc_bit $ sink.last_diff_enc_bit
             if is_valid_seq && diff_enc_bit == 0
-                println( "have first zero" )
-                sink.last_diff_enc_bit = diff_enc_bit
+                # println( "have first zero" )
                 sink.sync_shift_reg = (sink.sync_shift_reg << 1) | diff_enc_bit
-                # sink.sync_shift_reg = sink.sync_shift_reg << 1 | diff_dec_bit
                 sink.sync_shift_count += 1
                 sink.chip_shift_count = 0
                 sink.chip_shift_reg   = zero( sink.chip_shift_reg )
-            end # if is_valid_seq && diff_dec_bit == 0
-        else
-            if sink.sync_shift_count < 16
-                if sink.chip_shift_count == sink.chips_per_symbol
-                    (is_valid_seq, diff_enc_bit) = demap_chips( sink, sink.chip_shift_reg )
-                    diff_dec_bit                 = diff_enc_bit - sink.last_diff_enc_bit
-                    if is_valid_seq
-                        println( "168" )
-                        sink.sync_shift_reg = (sink.sync_shift_reg << 1) | diff_enc_bit
-                        # sink.sync_shift_reg = sink.sync_shift_reg << 1 | diff_dec_bit
-                        sink.sync_shift_count += 1
-                        sink.chip_shift_count = 0
-                        sink.chip_shift_reg   = zero( sink.chip_shift_reg )
-                    else
-                        println( "175" )
-                        set_state( sink, SyncSearch )
-                    end # if is_valid_seq
-                end 
-            else
-                    println( "180: checking sync sequence ", hex(sink.sync_shift_reg) )
-                    if sink.sync_shift_reg == sink.sync_sequence
-                        println( "182: got a sync sequence at input[&(sink.input_idx)]" )
-                        set_state( sink, HeaderSearch )
-                        break
-                    else
-                        println("186")
-                        set_state( sink, SyncSearch )
-                    end # if sink.sync_shift_reg == sink.sync_sequence
+                set_state( sink, SFDSearch )
+                break
             end
         end
-    end # sink.input_idx <= length( input )
+    end
+
+end
+
+function sfdsearch( sink::PacketSink, input::Vector )
+    while sink.input_idx <= length( input )
+
+        # Shift chips into the register, to look for first zero
+        sink.chip_shift_reg    = uint16( (sink.chip_shift_reg >> 1) | ((input[sink.input_idx] & 1)<<14) )
+        @printf( "SFDSearch. input_idx: %d, chip_shift_reg: %s, chip_shift_count: %d, sync_shift_reg: %s sync_shift_count: %d\n", sink.input_idx, bin(sink.chip_shift_reg, 15),sink.chip_shift_count, hex(sink.sync_shift_reg,4), sink.sync_shift_count )
+        sink.input_idx        += 1
+        sink.chip_shift_count += 1
+
+
+        # Compare shift register against the chip sequence representing 0
+        # if it is a zero, begin processing 15 chip sequences at a time
+        # and shift those into decoded bits into the sync_shift_reg to look for the
+        # sync_sequence
+
+        # Have not yet shifted first bit into sync_shift_reg
+        if sink.chip_shift_count == 15
+            (is_valid_seq, diff_enc_bit) = demap_chips( sink, sink.chip_shift_reg )
+            if !is_valid_seq
+                set_state( sink, SyncOnZero )
+                break
+            end
+
+            sink.chip_shift_count = 0
+            sink.chip_shift_reg   = zero( sink.chip_shift_reg )
+            sink.sync_shift_reg = (sink.sync_shift_reg << 1) | diff_enc_bit
+
+            if sink.sync_shift_reg == sink.sync_sequence
+                set_state( sink, HeaderSearch )
+                break
+            end
+
+        end
+    end
 
 end
 
 
-function headersearch( sink::PacketSink, input::Vector )
-    println( "headersearch" )
 
+function headersearch( sink::PacketSink, input::Vector )
+    println( "HeaderSearch" )
 end
 
 function payloadcollect( sink::PacketSink, input::Vector )
@@ -213,9 +230,10 @@ function exec( sink::PacketSink, input::Vector )
     while sink.input_idx <= length(input)
 
         @match sink.state begin
-            SyncSearch      => syncsearch( sink, input )
-            HeaderSearch    => headersearch( sink, input )
-            PayloadCollect  => payloadcollect( sink, input )
+            SyncOnZero      => synconzero( sink, input )
+            SFDSearch       => sfdsearch( sink, input )
+            HeaderSearch    => break #headersearch( sink, input )
+            PayloadCollect  => break #payloadcollect( sink, input )
         end
 
     end
@@ -233,13 +251,13 @@ end
 
 
 function spread( chip_map::AbstractVector, chips_per_symbol::Integer, packet::AbstractVector{Uint8}; diff_enc = false )
-    
+
     packet_len        = length( packet )
     frame_len         = packet_len * 8 * chips_per_symbol
     frame             = zeros( Uint8, frame_len )
     last_diff_enc_bit = 0
     frame_idx         = 0
-    
+
     for packet_idx in 0:packet_len-1
         packet_byte = packet[packet_idx+1]
 
@@ -252,27 +270,27 @@ function spread( chip_map::AbstractVector, chips_per_symbol::Integer, packet::Ab
             end
 
             chips = chip_map[packet_bit+1]
-            
+
             for chip_idx in 0:chips_per_symbol-1
                 frame[frame_idx+1] = (chips >> chip_idx) & 0x01
-                frame_idx       += 1 
+                frame_idx       += 1
             end
-            
+
         end
     end
-    
-    
-    return frame    
+
+
+    return frame
 end
 
 
 
 function exec( source::PacketSource, input::Vector{Uint8} )
     payload_len = uint8( length( input ) & 0b0111111 )
-    packet      = [ 0x00, 0x00, 0x00, 0xA7, payload_len, input ]
-    
+    packet      = [ 0x00, 0x00, 0x00, 0x00, 0x00, 0xA7, payload_len, input ]
+
     spread( CHIP_MAP_BPSK, source.chips_per_symbol, packet, diff_enc = false )
-    
+
 end
 
 
