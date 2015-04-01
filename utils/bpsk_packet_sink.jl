@@ -1,8 +1,5 @@
 module ieee802_15_4
 
-using Match
-
-
 export  PacketSink,
         PacketSource,
         Modulation,
@@ -14,11 +11,11 @@ export  PacketSink,
         exec
 
 
-abstract PHYState
-type SyncOnZero     <: PHYState end
-type SFDSearch      <: PHYState end
-type HeaderSearch   <: PHYState end
-type PayloadCollect <: PHYState end
+abstract PackState
+type SyncOnZero     <: PackState end
+type SFDSearch      <: PackState end
+type HeaderSearch   <: PackState end
+type PayloadCollect <: PackState end
 
 
 abstract Modulation
@@ -35,7 +32,7 @@ const CHIP_MASK_BPSK    = 0b0011111111111110
 
 type PacketSink{M}
     modulation::Type{M}        # BPSK, OQPSK, etc
-    state::Type                # what is our PHYState
+    state::Type                # what is our PackState
     chips_per_symbol::Int      # how many chips per demodulated symbol. 15 For BPSK, 32 for OQPSK
     chip_map::Vector{Uint16}   # Chip to bit(s) mapping for modulation T
     sync_sequence::Uint16      # 802.15.4 standard is 4x 0 bytes and 1x0xA7, we will ignore the first byte
@@ -190,6 +187,7 @@ function sfdsearch( sink::PacketSink{BPSK}, input::Vector )
             end
 
             sink.packet_byte            = uint8( (sink.packet_byte >> 1) | (diff_enc_bit << 7) )
+            # sink.packet_byte_bit_count += 1
             sink.chip_shift_count       = 0
             sink.chip_shift_reg         = zero( sink.chip_shift_reg )
 
@@ -313,13 +311,16 @@ function exec( sink::PacketSink{BPSK}, input::Vector )
     sink.input_idx = 1
 
     while sink.input_idx <= length(input)
-
-        @match sink.state begin
-            SyncOnZero      => synconzero( sink, input )
-            SFDSearch       => sfdsearch( sink, input )
-            HeaderSearch    => headersearch( sink, input )
-            PayloadCollect  => payloadcollect( sink, input )
-        end
+        
+        if sink.state == SyncOnZero
+            synconzero( sink, input )
+        elseif sink.state == SFDSearch
+            sfdsearch( sink, input )
+        elseif sink.state == HeaderSearch
+            headersearch( sink, input )
+        elseif sink.state == PayloadCollect
+            payloadcollect( sink, input )
+        end        
 
     end
 end
