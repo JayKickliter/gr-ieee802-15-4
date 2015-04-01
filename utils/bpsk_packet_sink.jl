@@ -25,33 +25,32 @@ abstract Modulation
 type BPSK  <: Modulation end
 type OQPSK <: Modulation end
 
+const VERBOSE           = 2
 const MAX_PKT_LEN       = 127
 const CHIP_MAP_BPSK     = Uint16[ 0b000100110101111, 0b111011001010000 ]
 const CHIP_MASK_BPSK    = 0b0011111111111110
 
-const VERBOSE           = 2
 
 
 
 type PacketSink{M}
-    modulation::Type{M}      # BPSK, OQPSK, etc
-    state::Type              # what is our PHYState
-    chips_per_symbol::Int    # how many chips per demodulated symbol. 15 For BPSK, 32 for OQPSK
-    chip_map::Vector{Uint16} # Chip to bit(s) mapping for modulation T
-    sync_sequence::Uint16    # 802.15.4 standard is 4x 0 bytes and 1x0xA7, we will ignore the first byte
-    threshold::Int           # how many bits may be wrong in sync vector
-    sync_shift_reg::Uint16   # decoded chips are shifted in, and compared against sync_sequence
-    chip_shift_reg::Uint16   # chips are shifted in and decoded to look for first 0
-    chip_shift_count::Int    # how many chips have we shifted into chip_shift_reg
-    last_diff_enc_bit::Int   # previous not-yet-decoded bit, need to keep it to do differential decoding
-    packet::Vector{Uint8}    # assembled payload
-    packet_byte::Uint8       # byte being assembled
-    packet_byte_count::Int   # which bit of d_packet_byte we're working on
-    packetlen::Int           # length of packet
-    packetlen_cnt::Int       # how many so far
-    payload_cnt::Int         # how many bytes in payload
-    input_idx::Int           # our location in the input vector
-    packet_byte_bit_count::Int #   
+    modulation::Type{M}        # BPSK, OQPSK, etc
+    state::Type                # what is our PHYState
+    chips_per_symbol::Int      # how many chips per demodulated symbol. 15 For BPSK, 32 for OQPSK
+    chip_map::Vector{Uint16}   # Chip to bit(s) mapping for modulation T
+    sync_sequence::Uint16      # 802.15.4 standard is 4x 0 bytes and 1x0xA7, we will ignore the first byte
+    threshold::Int             # how many bits may be wrong in sync vector
+    chip_shift_reg::Uint16     # chips are shifted in and decoded to look for first 0
+    chip_shift_count::Int      # how many chips have we shifted into chip_shift_reg
+    last_diff_enc_bit::Int     # previous not-yet-decoded bit, need to keep it to do differential decoding
+    packet::Vector{Uint8}      # assembled payload
+    packet_byte::Uint8         # byte being assembled
+    packet_byte_count::Int     # which bit of d_packet_byte we're working on
+    packetlen::Int             # length of packet
+    packetlen_cnt::Int         # how many so far
+    payload_cnt::Int           # how many bytes in payload
+    input_idx::Int             # our location in the input vector
+    packet_byte_bit_count::Int # how many bits have we shifted into packet_byte  
 end
 
 function PacketSink( modType, threshold )
@@ -61,7 +60,6 @@ function PacketSink( modType, threshold )
     chip_map              = CHIP_MAP_BPSK
     sync_sequence         = 0x00e5
     threshold             = threshold
-    sync_shift_reg        = zero( Uint16 )
     chip_shift_reg        = zero( Uint16 )
     chip_shift_count      = 0
     last_diff_enc_bit     = 0
@@ -80,7 +78,6 @@ function PacketSink( modType, threshold )
                 chip_map,
                 sync_sequence,
                 threshold,
-                sync_shift_reg,
                 chip_shift_reg,
                 chip_shift_count,
                 last_diff_enc_bit,
@@ -98,6 +95,7 @@ end
 function count_bit_diffs( a, b, mask )
     count_ones( (a & mask) $ (b & mask) )
 end
+
 
 function chips_to_bit( sink::PacketSink{BPSK}, chips::Integer )
     best_match = 0xFF
@@ -124,11 +122,11 @@ function set_state( sink::PacketSink{BPSK}, ::Type{SyncOnZero} )
     VERBOSE > 0 && println( sink.state, " -> SyncOnZero" )
     sink.state             = SyncOnZero
     sink.last_diff_enc_bit = 0
-    sink.sync_shift_reg    = zero( Uint16 )
     sink.chip_shift_reg    = zero( Uint16 )
     sink.chip_shift_count  = 0
     sink.packet_byte       = 0
 end
+
 
 function set_state( sink::PacketSink{BPSK}, ::Type{SFDSearch} )
     VERBOSE > 0 && println( sink.state, " -> SFDSearch" )
@@ -137,7 +135,9 @@ function set_state( sink::PacketSink{BPSK}, ::Type{SFDSearch} )
     sink.chip_shift_reg    = zero( Uint16 )
     sink.chip_shift_count  = 0
     sink.packet_byte       = 0
+    sink.packet_byte_bit_count = 0
 end
+
 
 function set_state( sink::PacketSink{BPSK}, ::Type{HeaderSearch} )
     VERBOSE > 0 && println( sink.state, " -> HeaderSearch" )
@@ -147,6 +147,7 @@ function set_state( sink::PacketSink{BPSK}, ::Type{HeaderSearch} )
     sink.packet_byte_count     = 0
 end
 
+
 function set_state( sink::PacketSink{BPSK}, ::Type{PayloadCollect} )
     VERBOSE > 0 && println( sink.state, " -> PayloadCollect" )
     sink.state                 = PayloadCollect
@@ -155,10 +156,10 @@ function set_state( sink::PacketSink{BPSK}, ::Type{PayloadCollect} )
     sink.packet_byte_count     = 0
 end
 
-function synconzero( sink::PacketSink{BPSK}, input::Vector )
 
+function synconzero( sink::PacketSink{BPSK}, input::Vector )
     while sink.input_idx <= length( input )
-        VERBOSE > 1 && @printf( "SyncOnZero. input_idx: %d, chip_shift_reg: %s, chip_shift_count: %d, sync_shift_reg: %s\n", sink.input_idx, bin(sink.chip_shift_reg, 15),sink.chip_shift_count, hex(sink.sync_shift_reg,4))
+        VERBOSE > 1 && @printf( "SFDSearch. input_idx: %d, chip_shift_reg: %s, chip_shift_count: %d, packet_byte_bit_count: %d, packet_byte: %s\n", sink.input_idx, bin(sink.chip_shift_reg, 15),sink.chip_shift_count, sink.packet_byte_bit_count, hex(sink.packet_byte,2))
         sink.chip_shift_reg    = uint16( (sink.chip_shift_reg >> 1) | ((input[sink.input_idx] & 1)<<14) )
         sink.input_idx        += 1
         sink.chip_shift_count += 1
@@ -166,9 +167,6 @@ function synconzero( sink::PacketSink{BPSK}, input::Vector )
         (is_valid_seq, diff_enc_bit) = chips_to_bit( sink, sink.chip_shift_reg )
 
         if is_valid_seq && diff_enc_bit == 0
-            sink.sync_shift_reg    = (sink.sync_shift_reg << 1) | diff_enc_bit
-            sink.chip_shift_count  = 0
-            sink.chip_shift_reg    = zero( sink.chip_shift_reg )
             set_state( sink, SFDSearch )
             break
         end
@@ -176,14 +174,13 @@ function synconzero( sink::PacketSink{BPSK}, input::Vector )
 
 end
 
-function sfdsearch( sink::PacketSink{BPSK}, input::Vector )
 
+function sfdsearch( sink::PacketSink{BPSK}, input::Vector )
     while sink.input_idx <= length( input )
-        VERBOSE > 1 && @printf( "SFDSearch. input_idx: %d, chip_shift_reg: %s, chip_shift_count: %d, sync_shift_reg: %s\n", sink.input_idx, bin(sink.chip_shift_reg, 15),sink.chip_shift_count, hex(sink.sync_shift_reg,4))
+        VERBOSE > 1 && @printf( "SFDSearch. input_idx: %d, chip_shift_reg: %s, chip_shift_count: %d, packet_byte_bit_count: %d, packet_byte: %s\n", sink.input_idx, bin(sink.chip_shift_reg, 15),sink.chip_shift_count, sink.packet_byte_bit_count, hex(sink.packet_byte,2))    
         sink.chip_shift_reg    = uint16( (sink.chip_shift_reg >> 1) | ((input[sink.input_idx] & 1)<<14) )
         sink.input_idx        += 1
         sink.chip_shift_count += 1
-        
 
         if sink.chip_shift_count == 15
             (is_valid_seq, diff_enc_bit) = chips_to_bit( sink, sink.chip_shift_reg )
@@ -192,26 +189,25 @@ function sfdsearch( sink::PacketSink{BPSK}, input::Vector )
                 break
             end
 
-            sink.sync_shift_reg   = uint16( (sink.sync_shift_reg << 1) | diff_enc_bit )
+            sink.packet_byte            = uint8( (sink.packet_byte >> 1) | (diff_enc_bit << 7) )
+            sink.chip_shift_count       = 0
+            sink.chip_shift_reg         = zero( sink.chip_shift_reg )
 
-            sink.chip_shift_count = 0
-            sink.chip_shift_reg   = zero( sink.chip_shift_reg )
-
-            if sink.sync_shift_reg == sink.sync_sequence
+            
+            if sink.packet_byte == 0xA7
+                VERBOSE > 0 && println( "Got start of frame delimiter (SFD)")
                 set_state( sink, HeaderSearch )
                 break
             end
-
         end
     end
 
 end
 
 
-
 function headersearch( sink::PacketSink{BPSK}, input::Vector )
     while sink.input_idx <= length( input )
-        VERBOSE > 1 && @printf( "HeaderSearch. input_idx: %d, chip_shift_reg: %s, chip_shift_count: %d, packet_byte: %s\n", sink.input_idx, bin(sink.chip_shift_reg, 15),sink.chip_shift_count, hex(sink.packet_byte,4))    
+        VERBOSE > 1 && @printf( "HeaderSearch. input_idx: %d, chip_shift_reg: %s, chip_shift_count: %d, packet_byte: %s\n", sink.input_idx, bin(sink.chip_shift_reg, 15),sink.chip_shift_count, hex(sink.packet_byte,2))    
         sink.chip_shift_reg    = uint16( (sink.chip_shift_reg >> 1) | ((input[sink.input_idx] & 1)<<14) )
         sink.input_idx        += 1
         sink.chip_shift_count += 1
@@ -246,9 +242,10 @@ function headersearch( sink::PacketSink{BPSK}, input::Vector )
     end
 end
 
+
 function payloadcollect( sink::PacketSink{BPSK}, input::Vector )
     while sink.input_idx <= length( input )
-        VERBOSE > 1 && @printf( "PayloadCollect. input_idx: %d, chip_shift_reg: %s, chip_shift_count: %d, packet_byte: %s\n", sink.input_idx, bin(sink.chip_shift_reg, 15),sink.chip_shift_count, hex(sink.packet_byte,4))    
+        VERBOSE > 1 && @printf( "PayloadCollect. input_idx: %d, chip_shift_reg: %s, chip_shift_count: %d, packet_byte: %s\n", sink.input_idx, bin(sink.chip_shift_reg, 15),sink.chip_shift_count, hex(sink.packet_byte,2))    
         sink.chip_shift_reg    = uint16( (sink.chip_shift_reg >> 1) | ((input[sink.input_idx] & 1)<<14) )
         sink.input_idx        += 1
         sink.chip_shift_count += 1
@@ -283,6 +280,9 @@ function payloadcollect( sink::PacketSink{BPSK}, input::Vector )
     end
 end
 
+
+
+
 function returnpacket( sink::PacketSink{BPSK} )
     println()
     println()
@@ -305,6 +305,8 @@ function returnpacket( sink::PacketSink{BPSK} )
 end
 
 
+
+
 function exec( sink::PacketSink{BPSK}, input::Vector )
     VERBOSE > 0 && println( "exec" )
 
@@ -322,15 +324,21 @@ function exec( sink::PacketSink{BPSK}, input::Vector )
     end
 end
 
+
+
+
 type PacketSource
     modulation        # BPSK, OQPSK, etc
     chips_per_symbol  # how many chips per demodulated symbol. 15 For BPSK, 32 for OQPSK
     chip_map          # Chip to bit(s) mapping for modulation T
 end
 
+
 function PacketSource( ::Type{BPSK} )
     PacketSource( BPSK, 15, CHIP_MAP_BPSK )
 end
+
+
 
 
 function spread( chip_map::AbstractVector, chips_per_symbol::Integer, packet::AbstractVector{Uint8}; diff_enc = false )
@@ -362,7 +370,6 @@ function spread( chip_map::AbstractVector, chips_per_symbol::Integer, packet::Ab
         end
     end
 
-
     return frame
 end
 
@@ -371,6 +378,7 @@ function make_packet( source::PacketSource, input::Vector{Uint8} )
     payload_len = uint8( length( input ) & 0b0111111 )
     packet      = [ 0x00, 0x00, 0x00, 0x00, 0xA7, payload_len, input ]
 end
+
 
 function exec( source::PacketSource, input::Vector{Uint8} )
     packet = make_packet( source, input )
@@ -389,6 +397,11 @@ sink            = PacketSink( BPSK, 0 )
 payload         = [ 0xDE, 0xAD, 0xFE, 0xED ]
 tx_packet_chips = exec( source, payload )
 
+
+# exec( sink, tx_packet_chips )
+
+
+exec( sink, tx_packet_chips[51:end-20] )
 exec( sink, tx_packet_chips[1:50] )
 exec( sink, tx_packet_chips[51:end-20] )
 exec( sink, tx_packet_chips[end-19:end] )
