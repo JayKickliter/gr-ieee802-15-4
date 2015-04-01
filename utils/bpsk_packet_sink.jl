@@ -29,6 +29,8 @@ const MAX_PKT_LEN       = 127
 const CHIP_MAP_BPSK     = Uint16[ 0b000100110101111, 0b111011001010000 ]
 const CHIP_MASK_BPSK    = 0b0011111111111110
 
+const VERBOSE           = 2
+
 
 
 type PacketSink{M}
@@ -119,7 +121,7 @@ end
 
 
 function set_state( sink::PacketSink{BPSK}, ::Type{SyncOnZero} )
-    println( sink.state, " -> SyncOnZero" )
+    VERBOSE > 0 && println( sink.state, " -> SyncOnZero" )
     sink.state             = SyncOnZero
     sink.last_diff_enc_bit = 0
     sink.sync_shift_reg    = zero( Uint16 )
@@ -129,7 +131,7 @@ function set_state( sink::PacketSink{BPSK}, ::Type{SyncOnZero} )
 end
 
 function set_state( sink::PacketSink{BPSK}, ::Type{SFDSearch} )
-    println( sink.state, " -> SFDSearch" )
+    VERBOSE > 0 && println( sink.state, " -> SFDSearch" )
     sink.state             = SFDSearch
     sink.last_diff_enc_bit = 0
     sink.chip_shift_reg    = zero( Uint16 )
@@ -138,7 +140,7 @@ function set_state( sink::PacketSink{BPSK}, ::Type{SFDSearch} )
 end
 
 function set_state( sink::PacketSink{BPSK}, ::Type{HeaderSearch} )
-    println( sink.state, " -> HeaderSearch" )
+    VERBOSE > 0 && println( sink.state, " -> HeaderSearch" )
     sink.state                 = HeaderSearch
     sink.packet_byte           = 0
     sink.packet_byte_bit_count = 0
@@ -146,18 +148,17 @@ function set_state( sink::PacketSink{BPSK}, ::Type{HeaderSearch} )
 end
 
 function set_state( sink::PacketSink{BPSK}, ::Type{PayloadCollect} )
-    println( sink.state, " -> PayloadCollect" )
-    sink.state             = PayloadCollect
-    # sink.packetlen         = payload_len
-    # sink.payload_cnt       = 0
-    # sink.packet_byte       = 0
-    # sink.packet_byte_count = 0
+    VERBOSE > 0 && println( sink.state, " -> PayloadCollect" )
+    sink.state                 = PayloadCollect
+    sink.packet_byte           = 0
+    sink.packet_byte_bit_count = 0
+    sink.packet_byte_count     = 0
 end
 
 function synconzero( sink::PacketSink{BPSK}, input::Vector )
 
     while sink.input_idx <= length( input )
-        @printf( "SyncOnZero. input_idx: %d, chip_shift_reg: %s, chip_shift_count: %d, sync_shift_reg: %s\n", sink.input_idx, bin(sink.chip_shift_reg, 15),sink.chip_shift_count, hex(sink.sync_shift_reg,4))
+        VERBOSE > 1 && @printf( "SyncOnZero. input_idx: %d, chip_shift_reg: %s, chip_shift_count: %d, sync_shift_reg: %s\n", sink.input_idx, bin(sink.chip_shift_reg, 15),sink.chip_shift_count, hex(sink.sync_shift_reg,4))
         sink.chip_shift_reg    = uint16( (sink.chip_shift_reg >> 1) | ((input[sink.input_idx] & 1)<<14) )
         sink.input_idx        += 1
         sink.chip_shift_count += 1
@@ -178,7 +179,7 @@ end
 function sfdsearch( sink::PacketSink{BPSK}, input::Vector )
 
     while sink.input_idx <= length( input )
-        @printf( "SFDSearch. input_idx: %d, chip_shift_reg: %s, chip_shift_count: %d, sync_shift_reg: %s\n", sink.input_idx, bin(sink.chip_shift_reg, 15),sink.chip_shift_count, hex(sink.sync_shift_reg,4))
+        VERBOSE > 1 && @printf( "SFDSearch. input_idx: %d, chip_shift_reg: %s, chip_shift_count: %d, sync_shift_reg: %s\n", sink.input_idx, bin(sink.chip_shift_reg, 15),sink.chip_shift_count, hex(sink.sync_shift_reg,4))
         sink.chip_shift_reg    = uint16( (sink.chip_shift_reg >> 1) | ((input[sink.input_idx] & 1)<<14) )
         sink.input_idx        += 1
         sink.chip_shift_count += 1
@@ -210,7 +211,7 @@ end
 
 function headersearch( sink::PacketSink{BPSK}, input::Vector )
     while sink.input_idx <= length( input )
-        @printf( "HeaderSearch. input_idx: %d, chip_shift_reg: %s, chip_shift_count: %d, packet_byte: %s\n", sink.input_idx, bin(sink.chip_shift_reg, 15),sink.chip_shift_count, hex(sink.packet_byte,4))    
+        VERBOSE > 1 && @printf( "HeaderSearch. input_idx: %d, chip_shift_reg: %s, chip_shift_count: %d, packet_byte: %s\n", sink.input_idx, bin(sink.chip_shift_reg, 15),sink.chip_shift_count, hex(sink.packet_byte,4))    
         sink.chip_shift_reg    = uint16( (sink.chip_shift_reg >> 1) | ((input[sink.input_idx] & 1)<<14) )
         sink.input_idx        += 1
         sink.chip_shift_count += 1
@@ -222,33 +223,90 @@ function headersearch( sink::PacketSink{BPSK}, input::Vector )
                 break
             end
 
-            sink.packet_byte = uint8( (sink.sync_shift_reg << 1) | diff_enc_bit )
+            sink.packet_byte = uint8( (sink.packet_byte >> 1) | (diff_enc_bit << 7) )
             sink.packet_byte_bit_count += 1
             sink.chip_shift_count = 0
             sink.chip_shift_reg   = zero( sink.chip_shift_reg )
 
-            if sink.packet_byte_bit_count == 8
+            if sink.packet_byte_bit_count == 8                
                 sink.packetlen = sink.packet_byte
-                println( "Packet lenght = ", sink.packetlen )
+                VERBOSE > 0 && println( "Packet lenght = ", sink.packetlen )
+                
+                sink.packet = zeros( Uint8, sink.packetlen )
+                
+                if sink.packetlen > MAX_PKT_LEN
+                    set_state( sink, SyncOnZero )
+                    break
+                end
+                
                 set_state( sink, PayloadCollect )
                 break
             end
         end
-        
     end
 end
 
 function payloadcollect( sink::PacketSink{BPSK}, input::Vector )
-    @printf( "PayloadCollect. input_idx: %d, chip_shift_reg: %s, chip_shift_count: %d, sync_shift_reg: %s\n", sink.input_idx, bin(sink.chip_shift_reg, 15),sink.chip_shift_count, hex(sink.sync_shift_reg,4))
-    println( "PayloadCollect" )
-    set_state( sink, SyncOnZero )    
+    while sink.input_idx <= length( input )
+        VERBOSE > 1 && @printf( "PayloadCollect. input_idx: %d, chip_shift_reg: %s, chip_shift_count: %d, packet_byte: %s\n", sink.input_idx, bin(sink.chip_shift_reg, 15),sink.chip_shift_count, hex(sink.packet_byte,4))    
+        sink.chip_shift_reg    = uint16( (sink.chip_shift_reg >> 1) | ((input[sink.input_idx] & 1)<<14) )
+        sink.input_idx        += 1
+        sink.chip_shift_count += 1
+
+        if sink.chip_shift_count == 15
+            (is_valid_seq, diff_enc_bit) = chips_to_bit( sink, sink.chip_shift_reg )
+            if !is_valid_seq
+                set_state( sink, SyncOnZero )
+                break
+            end
+
+            sink.packet_byte = uint8( (sink.packet_byte >> 1) | (diff_enc_bit << 7) )
+            sink.packet_byte_bit_count += 1
+            sink.chip_shift_count = 0
+            sink.chip_shift_reg   = zero( sink.chip_shift_reg )
+
+            if sink.packet_byte_bit_count == 8                
+                sink.packet_byte_count += 1
+                sink.packet[sink.packet_byte_count] = sink.packet_byte
+                
+                VERBOSE > 0 && @printf( "packet[%d] = 0x%s ", sink.packet_byte_count, hex(sink.packet[sink.packet_byte_count]) )
+                
+                sink.packet_byte_bit_count = 0
+                
+                if sink.packet_byte_count + 1 > sink.packetlen
+                    returnpacket( sink )
+                    set_state( sink, SyncOnZero )
+                    break
+                end
+            end
+        end
+    end
+end
+
+function returnpacket( sink::PacketSink{BPSK} )
+    println()
+    println()
+    for i in 1:sink.packetlen-1
+        print( "=====" )
+    end
+    print( "====" )
+    println()
+    for i in 1:sink.packetlen
+        print( "0x", hex(sink.packet[i], 2), " " )
+    end
+    println()
+    for i in 1:sink.packetlen-1
+        print( "=====" )
+    end
+    print( "====" )
+    println()
+    println()
+    set_state( sink, SyncOnZero )
 end
 
 
-
-
 function exec( sink::PacketSink{BPSK}, input::Vector )
-    println( "exec" )
+    VERBOSE > 0 && println( "exec" )
 
     sink.input_idx = 1
 
@@ -328,8 +386,9 @@ using ieee802_15_4
 
 source          = PacketSource( BPSK )
 sink            = PacketSink( BPSK, 0 )
-tx_packet_bytes = make_packet( source, [0xFF] )
-# tx_packet_bytes = [ rand( Uint8, 32 ), tx_packet_bytes ]
-tx_packet_chips = spread( CHIP_MAP_BPSK, source.chips_per_symbol, tx_packet_bytes, diff_enc = false )
+payload         = [ 0xDE, 0xAD, 0xFE, 0xED ]
+tx_packet_chips = exec( source, payload )
 
-rx_packet       = exec( sink, tx_packet_chips )
+exec( sink, tx_packet_chips[1:50] )
+exec( sink, tx_packet_chips[51:end-20] )
+exec( sink, tx_packet_chips[end-19:end] )
