@@ -1,3 +1,5 @@
+require(joinpath(dirname(@__FILE__),"bpsk_packet_sink.jl"))
+
 using ieee802_15_4
 
 source          = PacketSource( BPSK )
@@ -8,8 +10,8 @@ tx_packet_chips = exec( source, payload, diff_enc = true )
 
 exec( sink, tx_packet_chips )
 
-exec( sink, tx_packet_chips[51:end-20] )
-exec( sink, tx_packet_chips[1:50] )
-exec( sink, tx_packet_chips[51:end-20] )
-exec( sink, tx_packet_chips[end-19:end] )
+# exec( sink, tx_packet_chips[51:end-20] )
+# exec( sink, tx_packet_chips[1:50] )
+# exec( sink, tx_packet_chips[51:end-20] )
+# exec( sink, tx_packet_chips[end-19:end] )
 

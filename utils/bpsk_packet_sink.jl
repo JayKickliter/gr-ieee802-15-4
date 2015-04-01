@@ -22,7 +22,7 @@ abstract Modulation
 type BPSK  <: Modulation end
 type OQPSK <: Modulation end
 
-const VERBOSE           = 2
+const VERBOSE           = 0
 const MAX_PKT_LEN       = 127
 const CHIP_MAP_BPSK     = Uint16[ 0b000100110101111, 0b111011001010000 ]
 const CHIP_MASK_BPSK    = 0b0011111111111110
@@ -131,7 +131,6 @@ end
 function set_state( sink::PacketSink{BPSK}, ::Type{SFDSearch} )
     VERBOSE > 1 && println( sink.state, " -> SFDSearch" )
     sink.state             = SFDSearch
-    # sink.last_diff_enc_bit = 0
     sink.chip_shift_reg    = zero( Uint16 )
     sink.chip_shift_count  = 0
     sink.packet_byte       = 0
@@ -166,16 +165,18 @@ function synconzero( sink::PacketSink{BPSK}, input::Vector )
 
         (is_valid_seq, rx_bit) = chips_to_bit( sink, sink.chip_shift_reg )
 
-        # if sink.differential
-        #     diff_dec_bit           = rx_bit $ sink.last_diff_enc_bit
-        #     sink.last_diff_enc_bit = rx_bit
-        #     rx_bit                 = diff_dec_bit
-        # end
+        if sink.differential
+            diff_dec_bit           = rx_bit $ sink.last_diff_enc_bit
+            sink.last_diff_enc_bit = rx_bit
+            rx_bit                 = diff_dec_bit
+        end
 
         if is_valid_seq && rx_bit == 0
             set_state( sink, SFDSearch )
             break
         end
+
+        sink.last_diff_enc_bit = 0
     end
 
 end
