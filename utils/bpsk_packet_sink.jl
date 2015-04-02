@@ -238,10 +238,10 @@ function headersearch( sink::PacketSink{BPSK}, input::Vector )
                 rx_bit                 = diff_dec_bit
             end
 
-            sink.packet_byte = uint8( (sink.packet_byte >> 1) | (rx_bit << 7) )
+            sink.packet_byte            = uint8( (sink.packet_byte >> 1) | (rx_bit << 7) )
             sink.packet_byte_bit_count += 1
-            sink.chip_shift_count = 0
-            sink.chip_shift_reg   = zero( sink.chip_shift_reg )
+            sink.chip_shift_count       = 0
+            sink.chip_shift_reg         = zero( sink.chip_shift_reg )
 
             if sink.packet_byte_bit_count == 8
                 sink.packetlen = sink.packet_byte
@@ -249,7 +249,7 @@ function headersearch( sink::PacketSink{BPSK}, input::Vector )
 
                 sink.packet = zeros( Uint8, sink.packetlen )
 
-                if sink.packetlen > MAX_PKT_LEN
+                if  sink.packetlen > MAX_PKT_LEN || sink.packetlen < 1
                     set_state( sink, SyncOnZero )
                     break
                 end
@@ -282,18 +282,16 @@ function payloadcollect( sink::PacketSink{BPSK}, input::Vector )
                 rx_bit                 = diff_dec_bit
             end
 
-            sink.packet_byte = uint8( (sink.packet_byte >> 1) | (rx_bit << 7) )
+            sink.packet_byte            = uint8( (sink.packet_byte >> 1) | (rx_bit << 7) )
             sink.packet_byte_bit_count += 1
-            sink.chip_shift_count = 0
-            sink.chip_shift_reg   = zero( sink.chip_shift_reg )
+            sink.chip_shift_count       = 0
+            sink.chip_shift_reg         = zero( sink.chip_shift_reg )
 
             if sink.packet_byte_bit_count == 8
                 sink.packet_byte_count += 1
+                VERBOSE > 1 && @printf( "packet[%d] = 0x%s ", sink.packet_byte_count, hex(sink.packet_byte) )
                 sink.packet[sink.packet_byte_count] = sink.packet_byte
-
-                VERBOSE > 1 && @printf( "packet[%d] = 0x%s ", sink.packet_byte_count, hex(sink.packet[sink.packet_byte_count]) )
-
-                sink.packet_byte_bit_count = 0
+                sink.packet_byte_bit_count          = 0
 
                 if sink.packet_byte_count + 1 > sink.packetlen
                     returnpacket( sink )
@@ -310,12 +308,10 @@ end
 
 function returnpacket( sink::PacketSink{BPSK} )
     println()
-    println()
     for i in 1:sink.packetlen-1
         print( "=====" )
     end
-    print( "====" )
-    println()
+    println( "====" )
     for i in 1:sink.packetlen
         print( "0x", hex(sink.packet[i], 2), " " )
     end
@@ -323,8 +319,7 @@ function returnpacket( sink::PacketSink{BPSK} )
     for i in 1:sink.packetlen-1
         print( "=====" )
     end
-    print( "====" )
-    println()
+    println( "====" )
     println()
     set_state( sink, SyncOnZero )
 end
