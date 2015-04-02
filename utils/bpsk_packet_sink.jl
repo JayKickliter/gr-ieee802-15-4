@@ -1,4 +1,5 @@
-module ieee802_15_4
+module IEEE802_15_4
+
 
 export  PacketSink,
         PacketSource,
@@ -27,7 +28,10 @@ const MAX_PKT_LEN       = 127
 const CHIP_MAP_BPSK     = Uint16[ 0b000100110101111, 0b111011001010000 ]
 const CHIP_MASK_BPSK    = 0b0011111111111110
 
-
+type Packet
+    
+    
+end
 
 
 type PacketSink{M}
@@ -35,7 +39,7 @@ type PacketSink{M}
     state::Type                # what is our PackState
     chips_per_symbol::Int      # how many chips per demodulated symbol. 15 For BPSK, 32 for OQPSK
     chip_map::Vector{Uint16}   # Chip to bit(s) mapping for modulation T
-    sync_sequence::Uint16      # 802.15.4 standard is 4x 0 bytes and 1x0xA7, we will ignore the first byte
+    sync_sequence::Uint8       # 802.15.4 standard is 4x 0 bytes and 1x0xA7, we will ignore the first byte
     threshold::Int             # how many bits may be wrong in sync vector
     chip_shift_reg::Uint16     # chips are shifted in and decoded to look for first 0
     chip_shift_count::Int      # how many chips have we shifted into chip_shift_reg
@@ -49,14 +53,16 @@ type PacketSink{M}
     input_idx::Int             # our location in the input vector
     packet_byte_bit_count::Int # how many bits have we shifted into packet_byte
     differential::Bool         # do differential decoding on the despread chips
+    preable_zeros_count::Int   # how many zeros (bits, not byes) received before receiving the SFD byte
 end
 
 function PacketSink( modType, threshold; diff_enc = false )
+
     modulation            = BPSK
     state                 = SyncOnZero
     chips_per_symbol      = 15
     chip_map              = CHIP_MAP_BPSK
-    sync_sequence         = 0x00e5
+    sync_sequence         = 0xA7
     threshold             = threshold
     chip_shift_reg        = zero( Uint16 )
     chip_shift_count      = 0
@@ -70,6 +76,7 @@ function PacketSink( modType, threshold; diff_enc = false )
     input_idx             = 0
     packet_byte_bit_count = 0
     differential          = diff_enc
+    preable_zeros_count   = 0
 
     PacketSink( modulation,
                 state,
@@ -88,7 +95,8 @@ function PacketSink( modType, threshold; diff_enc = false )
                 payload_cnt,
                 input_idx,
                 packet_byte_bit_count,
-                differential )
+                differential,
+                preable_zeros_count )
 end
 
 
@@ -120,20 +128,21 @@ end
 
 function set_state( sink::PacketSink{BPSK}, ::Type{SyncOnZero} )
     VERBOSE > 1 && println( sink.state, " -> SyncOnZero" )
-    sink.state             = SyncOnZero
-    sink.last_diff_enc_bit = 0
-    sink.chip_shift_reg    = zero( Uint16 )
-    sink.chip_shift_count  = 0
-    sink.packet_byte       = 0
+    sink.state               = SyncOnZero
+    sink.last_diff_enc_bit   = 0
+    sink.chip_shift_reg      = zero( Uint16 )
+    sink.chip_shift_count    = 0
+    sink.packet_byte         = 0
+    sink.preable_zeros_count = 0
 end
 
 
 function set_state( sink::PacketSink{BPSK}, ::Type{SFDSearch} )
     VERBOSE > 1 && println( sink.state, " -> SFDSearch" )
-    sink.state             = SFDSearch
-    sink.chip_shift_reg    = zero( Uint16 )
-    sink.chip_shift_count  = 0
-    sink.packet_byte       = 0
+    sink.state                 = SFDSearch
+    sink.chip_shift_reg        = zero( Uint16 )
+    sink.chip_shift_count      = 0
+    sink.packet_byte           = 0
     sink.packet_byte_bit_count = 0
 end
 
@@ -141,7 +150,6 @@ end
 function set_state( sink::PacketSink{BPSK}, ::Type{HeaderSearch} )
     VERBOSE > 1 && println( sink.state, " -> HeaderSearch" )
     sink.state                 = HeaderSearch
-    # sink.packet_byte           = 0
     sink.packet_byte_bit_count = 0
     sink.packet_byte_count     = 0
 end
@@ -172,6 +180,7 @@ function synconzero( sink::PacketSink{BPSK}, input::Vector )
         end
 
         if is_valid_seq && rx_bit == 0
+            sink.preable_zeros_count += 1
             set_state( sink, SFDSearch )
             break
         end
@@ -201,13 +210,23 @@ function sfdsearch( sink::PacketSink{BPSK}, input::Vector )
                 sink.last_diff_enc_bit = rx_bit
                 rx_bit                 = diff_dec_bit
             end
-
+            
+            if rx_bit == 0
+                sink.preable_zeros_count += 1
+            end
+            
+            if sink.preable_zeros_count > 4*8+3
+                VERBOSE > 1 && @printf( "Received %d zeros in the preable, going back to SyncOnZero\n", sink.preable_zeros_count )
+                set_state( sink, SyncOnZero )
+                break
+            end
+            
             sink.packet_byte            = uint8( (sink.packet_byte >> 1) | (rx_bit << 7) )
             sink.chip_shift_count       = 0
             sink.chip_shift_reg         = zero( sink.chip_shift_reg )
 
 
-            if sink.packet_byte == 0xA7
+            if sink.packet_byte == sink.sync_sequence
                 VERBOSE > 0 && println( "Got start of frame delimiter (SFD)")
                 set_state( sink, HeaderSearch )
                 break
@@ -308,18 +327,25 @@ end
 
 function returnpacket( sink::PacketSink{BPSK} )
     println()
-    for i in 1:sink.packetlen-1
-        print( "=====" )
+    print("┏")
+    for i in 1:min( sink.packetlen*5+5, 8*5+5 )
+        print( "━" )
     end
-    println( "====" )
+    println("┓")
+    print("┃ 00: ")
     for i in 1:sink.packetlen
         print( "0x", hex(sink.packet[i], 2), " " )
+        if mod( i, 8 ) == 0
+            println("┃")
+            print( "┃ ", dec(i,2), ": " )
+        end
     end
     println()
-    for i in 1:sink.packetlen-1
-        print( "=====" )
+    print("┗")
+    for i in 1:min( sink.packetlen*5+5, 8*5+5 )
+        print( "━" )
     end
-    println( "====" )
+    println("┛")
     println()
     set_state( sink, SyncOnZero )
 end
@@ -408,4 +434,6 @@ end
 
 
 
-end # module PacketSink
+
+
+end # module
