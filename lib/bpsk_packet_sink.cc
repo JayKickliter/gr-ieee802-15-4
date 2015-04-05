@@ -41,79 +41,67 @@ static const int          MAX_LQI_SAMPLES = 8;                  // Number of chi
 class bpsk_packet_sink_impl : public bpsk_packet_sink {
 public:
 
-void enter_search()
+
+void set_state( int state )
 {
-    if ( VERBOSITY > 0 )
-        fprintf( stderr, "@ enter_search\n");
+    switch( state ) {
+    case STATE_SYNC_SEARCH:
+        d_state                 = STATE_SYNC_SEARCH;
+        d_shift_reg             = 0;
+        d_preamble_cnt          = 0;
+        d_chip_cnt              = 0;
+        d_packet_byte           = 0;
+        d_last_diff_enc_bit     = 0;
+        break;
 
-    d_state             = STATE_SYNC_SEARCH;
-    d_shift_reg         = 0;
-    d_preamble_cnt      = 0;
-    d_chip_cnt          = 0;
-    d_packet_byte       = 0;
-    d_last_diff_enc_bit = 0;
-}
+    case STATE_HEADER_SEARCH:
+        d_state                 = STATE_HEADER_SEARCH;
+        d_packetlen_cnt         = 0;
+        d_packet_byte           = 0;
+        d_packet_byte_bit_count = 0;
+        d_lqi                   = 0;
+        d_lqi_sample_count      = 0;
+        break;
 
-void enter_have_sync()
-{
-    if ( VERBOSITY > 0 )
-        fprintf( stderr, "@ enter_have_sync\n");
-
-    d_state             = STATE_HAVE_SYNC;
-    d_packetlen_cnt     = 0;
-    d_packet_byte       = 0;
-    d_packet_byte_bit_count = 0;
-
-    // Link Quality Information
-    d_lqi              = 0;
-    d_lqi_sample_count = 0;
-}
-
-void enter_have_header( int payload_len )
-{
-    if ( VERBOSITY > 0 )
-        fprintf( stderr, "@ enter_have_header ( payload_len = %d )\n", payload_len );
-
-    d_state             = STATE_HAVE_HEADER;
-    d_packetlen         = payload_len;
-    d_payload_cnt       = 0;
-    d_packet_byte       = 0;
-    d_packet_byte_bit_count = 0;
+    case STATE_PAYLOAD_COLLECT:
+        d_state                 = STATE_PAYLOAD_COLLECT;
+        d_payload_cnt           = 0;
+        d_packet_byte           = 0;
+        d_packet_byte_bit_count = 0;
+        break;
+    }
 }
 
 
 unsigned char decode_chips( unsigned short chips ){
-    int i;
-    int best_match    = 0xFF;
-    int min_threshold = CHIPS_PER_SYMBOL + 1; // Matching to CHIPS_PER_SYMBOL chips, could never have a error of CHIPS_PER_SYMBOL + 1 chips
-    // int diff_dec_bit;
-    // int diff_enc_bit;
+    unsigned char i;
+    unsigned char chip_errors;
+    unsigned char min_chip_errors = CHIPS_PER_SYMBOL + 1; // Matching to CHIPS_PER_SYMBOL chips, could never have a error of CHIPS_PER_SYMBOL + 1 chips
+    unsigned char best_match      = 0xFF;
 
     for( i=0; i<2; i++) {
-        
-        
-        unsigned int threshold = gr::blocks::count_bits16(( chips & CHIP_MASK ) ^ ( CHIP_MAPPING[i] & CHIP_MASK ));
 
-        if ( threshold < min_threshold ) {
-            best_match    = i;
-            min_threshold = threshold;
+        chip_errors = gr::blocks::count_bits16(( chips & CHIP_MASK ) ^ ( CHIP_MAPPING[i] & CHIP_MASK ));
+
+        if ( chip_errors < min_chip_errors ) {
+            best_match      = i;
+            min_chip_errors = chip_errors;
         }
     }
 
-    if ( min_threshold < d_threshold ) {
-        if ( VERBOSITY > 2 )
-            fprintf( stderr, "Found sequence with %d errors at 0x%x\n", min_threshold, ( chips & 0x7FFE ) ^ ( CHIP_MAPPING[best_match] & 0x7FFE )), fflush( stderr );
-
-        // LQI: Average number of chips correct * MAX_LQI_SAMPLES
-        if ( d_lqi_sample_count < MAX_LQI_SAMPLES ) {
-            d_lqi += CHIPS_PER_SYMBOL - min_threshold;
-            d_lqi_sample_count++;
-        }
-
-        return (unsigned char) best_match & 0x01 ;
+    if ( min_chip_errors >= d_threshold ) {
+        return 0xFF;
     }
 
-    return 0xFF;
+    if ( VERBOSITY > 2 )
+        fprintf( stderr, "Found sequence with %d errors at 0x%x\n", min_chip_errors, ( chips & CHIP_MASK ) ^ ( CHIP_MAPPING[best_match] & CHIP_MASK )), fflush( stderr );
+
+    if ( d_lqi_sample_count < MAX_LQI_SAMPLES ) {   // LQI: Average number of chips correct * MAX_LQI_SAMPLES
+        d_lqi              += CHIPS_PER_SYMBOL - min_chip_errors;
+        d_lqi_sample_count += 1;
+    }
+
+    return best_match;
 }
 
 
@@ -130,8 +118,8 @@ bpsk_packet_sink_impl( int threshold )
     if ( VERBOSITY > 0 )
         fprintf( stderr, "syncvec: %x, threshold: %d\n", d_sync_vector, d_threshold ),fflush( stderr );
 
-    enter_search();
-    message_port_register_out( pmt::mp("out"));
+    set_state( STATE_SYNC_SEARCH );
+    message_port_register_out( pmt::mp("out") );
 }
 
 ~bpsk_packet_sink_impl()
@@ -149,15 +137,14 @@ int general_work(   int                         noutput,
     int                 count        = 0;
     int                 i            = 0;
     int                 rx_bit       = 0;
-    int                 diff_dec_bit = 0;                 
+    int                 diff_dec_bit = 0;
 
     if ( VERBOSITY > 0 )
         fprintf( stderr,">>> Entering state machine\n"),fflush( stderr );
 
     while( count < ninput ) {
         switch( d_state ) {
-
-        case STATE_SYNC_SEARCH:    // Look for sync vector
+        case STATE_SYNC_SEARCH: // Look for sync vector
             if ( VERBOSITY > 1 )
                 fprintf( stderr,"SYNC Search, ninput=%d syncvec=%x\n", ninput, d_sync_vector ),fflush( stderr );
 
@@ -172,44 +159,43 @@ int general_work(   int                         noutput,
                     d_chip_cnt = d_chip_cnt+1;
                 }
 
-                // The first if block syncronizes to chip sequences.
-                if( d_preamble_cnt == 0 ){
+
+                if( d_preamble_cnt == 0 ){                   // The first if block syncronizes to chip sequences.
                     rx_bit = decode_chips( d_shift_reg );
 
-                    if ( rx_bit == 0 ) {
+                    if ( rx_bit == 0 ) {                     // we found a 0 in the chip sequence
                         if ( VERBOSITY > 1 )
                             fprintf( stderr,"Found 0 in chip sequence\n"), fflush( stderr );
-                        d_preamble_cnt += 1;  // we found a 0 in the chip sequence
+                        d_preamble_cnt += 1;
                     }
-                } else {
-                    // we found the first 0, thus we only have to do the calculation every 15 chips
+                } else {                                     // we found the first 0, thus we only have to do the calculation every 15 chips
                     if( d_chip_cnt == 15 ){
                         d_chip_cnt = 0;
-                        
+
                         rx_bit = decode_chips( d_shift_reg );
-                                                
+
                         if ( rx_bit == 0xFF ) {
-                            enter_search();
+                            set_state( STATE_SYNC_SEARCH );
                             break;
                         }
-                        
+
                         diff_dec_bit        = rx_bit ^ d_last_diff_enc_bit;
                         d_last_diff_enc_bit = rx_bit;
                         rx_bit              = diff_dec_bit;
-                        
+
                         if ( rx_bit == 0 ) {
                             d_preamble_cnt += 1;
                         }
-                        
+
                         if ( d_preamble_cnt > MAX_PREAMBLE_COUNT ) {
-                            enter_search();
+                            set_state( STATE_SYNC_SEARCH );
                             break;
                         }
-                        
+
                         d_packet_byte = (d_packet_byte >> 1) | (rx_bit <<7);
-                        
+
                         if ( d_packet_byte == d_sync_vector ) {
-                            enter_have_sync();
+                            set_state( STATE_HEADER_SEARCH );
                             break;
                         }
                     }
@@ -217,12 +203,12 @@ int general_work(   int                         noutput,
             }
             break;
 
-        case STATE_HAVE_SYNC:
+        case STATE_HEADER_SEARCH:
             if ( VERBOSITY > 0 )
                 fprintf( stderr,"Header Search bitcnt=%d, header=0x%08x\n", d_headerbitlen_cnt, d_header ),
                 fflush( stderr );
 
-            while ( count < ninput ) {        // Decode the bytes one after another.
+            while ( count < ninput ) {                       // Decode the bytes one after another.
                 if( inbuf[count++] )
                     d_shift_reg = ( d_shift_reg << 1 ) | 1;
                 else
@@ -237,25 +223,25 @@ int general_work(   int                         noutput,
 
                     if( rx_bit == 0xFF ){
                         if( VERBOSITY > 1 )
-                            fprintf( stderr, "Found a not valid chip sequence! %u\n", d_shift_reg ), fflush( stderr );
-                        enter_search();
+                            fprintf( stderr, "Found an invalid chip sequence! %u\n", d_shift_reg ), fflush( stderr );
+                        set_state( STATE_SYNC_SEARCH );
                         break;
                     }
-                    
-                    diff_dec_bit        = rx_bit ^ d_last_diff_enc_bit;
-                    d_last_diff_enc_bit = rx_bit;
-                    rx_bit              = diff_dec_bit;
-                    
-                    d_packet_byte = (d_packet_byte >> 1) | (rx_bit << 7);
+
+                    diff_dec_bit             = rx_bit ^ d_last_diff_enc_bit;
+                    d_last_diff_enc_bit      = rx_bit;
+                    rx_bit                   = diff_dec_bit;
+                    d_packet_byte            = (d_packet_byte >> 1) | (rx_bit << 7);
                     d_packet_byte_bit_count += 1;
-                    
-                    if( d_packet_byte_bit_count == 8 ){
-                        // we have a complete byte which represents the frame length.
-                        int frame_len = d_packet_byte;
-                        if( frame_len <= MAX_PKT_LEN ){
-                            enter_have_header( frame_len );
+
+                    if( d_packet_byte_bit_count == 8 ){      // we have a complete byte which represents the frame length.
+                        int packetlen = d_packet_byte;
+
+                        if( packetlen <= MAX_PKT_LEN ){
+                            d_packetlen = packetlen;
+                            set_state( STATE_PAYLOAD_COLLECT );
                         } else {
-                            enter_search();
+                            set_state( STATE_SYNC_SEARCH );
                         }
                         break;
                     }
@@ -263,7 +249,7 @@ int general_work(   int                         noutput,
             }
             break;
 
-        case STATE_HAVE_HEADER:
+        case STATE_PAYLOAD_COLLECT:
             if ( VERBOSITY > 0 )
                 fprintf( stderr,"Packet Build count=%d, ninput=%d, packet_len=%d\n", count, ninput, d_packetlen ),fflush( stderr );
 
@@ -277,23 +263,23 @@ int general_work(   int                         noutput,
 
                 if( d_chip_cnt == 0 ){
                     rx_bit = decode_chips( d_shift_reg );
-                    if( rx_bit == 0xff ){                         // something is wrong. restart the search for a sync
+                    if( rx_bit == 0xff ){                    // something is wrong. restart the search for a sync
                         if( VERBOSITY > 1 )
-                            fprintf( stderr, "Found a not valid chip sequence! %u\n", d_shift_reg ), fflush( stderr );
+                            fprintf( stderr, "Found an invalid chip sequence! %u\n", d_shift_reg ), fflush( stderr );
 
-                        enter_search();
+                        set_state( STATE_SYNC_SEARCH );
                         break;
                     }
-                    
+
                     diff_dec_bit        = rx_bit ^ d_last_diff_enc_bit;
                     d_last_diff_enc_bit = rx_bit;
                     rx_bit              = diff_dec_bit;
-                    
+
                     d_packet_byte = (d_packet_byte >> 1) | (rx_bit << 7);
                     d_packet_byte_bit_count += 1;
 
-                    if( d_packet_byte_bit_count == 8 ){
-                                                           // we have a complete byte
+                    if( d_packet_byte_bit_count == 8 ){      // we have a complete byte
+
                         if ( VERBOSITY > 0 )
                             fprintf( stderr, "packetcnt: %d, payloadcnt: %d, payload 0x%x, d_packet_byte_bit_count: %d\n", d_packetlen_cnt, d_payload_cnt, d_packet_byte, d_packet_byte_bit_count ), fflush( stderr );
 
@@ -305,18 +291,15 @@ int general_work(   int                         noutput,
                             unsigned int scaled_lqi = ( d_lqi / MAX_LQI_SAMPLES ) << 3;
                             unsigned char lqi       = ( scaled_lqi >= 256? 255 : scaled_lqi );
 
-                            pmt::pmt_t meta         = pmt::make_dict();
-                            meta                    = pmt::dict_add( meta, pmt::mp("lqi"), pmt::from_long( lqi ));
-
+                            pmt::pmt_t meta    = pmt::make_dict();
+                            meta               = pmt::dict_add( meta, pmt::mp("lqi"), pmt::from_long( lqi ));
                             std::memcpy( buf, d_packet, d_packetlen_cnt );
-                            pmt::pmt_t payload      = pmt::make_blob( buf, d_packetlen_cnt );
-
+                            pmt::pmt_t payload = pmt::make_blob( buf, d_packetlen_cnt );
                             message_port_pub( pmt::mp("out"), pmt::cons( meta, payload ));
-
 
                             if( VERBOSITY > 0 )
                                 fprintf( stderr, "Adding message of size %d to queue\n", d_packetlen_cnt );
-                            enter_search();
+                            set_state( STATE_SYNC_SEARCH );
                             break;
                         }
                     }
@@ -341,7 +324,7 @@ int general_work(   int                         noutput,
 }
 
 private:
-    enum {STATE_SYNC_SEARCH, STATE_HAVE_SYNC, STATE_HAVE_HEADER} d_state;
+    enum {STATE_SYNC_SEARCH, STATE_HEADER_SEARCH, STATE_PAYLOAD_COLLECT} d_state;
 
     unsigned int      d_sync_vector;           // 802.15.4 standard is 4x 0 bytes and 1x0xA7
     unsigned int      d_threshold;             // how many bits may be wrong in sync vector
