@@ -29,9 +29,9 @@
 
 using namespace gr::ieee802_15_4;
 
-#define VERBOSITY           1                                   // How much debug information to print, from 0 (nothing) to 2 (almost everthing)
+#define VERBOSITY           0                                   // How much debug information to print, from 0 (nothing) to 2 (almost everthing)
 #define CHIPS_PER_SYMBOL    15                                  // the standard specifies 15 chips per differentially encoded bit for BPSK
-#define CHIP_MASK           0x3FFE                              // 0b0011111111111110
+#define CHIP_MASK           0x3FFE                              // 0b0011111111111110, ignore the first and last chip since it depends on the last chip, FIXME: we can store the last chip
 #define MAX_PREAMBLE_COUNT  8*CHIPS_PER_SYMBOL+3                // Maximum valid number of zero symbols received in a row while waiting for SFD
 
 static const unsigned int CHIP_MAPPING[]  = { 0x09af, 0x7650 }; // See IEEE Std 802.15.4-2003, 6.6.2.3 Bit-to-chip mapping
@@ -86,13 +86,13 @@ unsigned char decode_chips( unsigned short chips ){
     int i;
     int best_match    = 0xFF;
     int min_threshold = CHIPS_PER_SYMBOL + 1; // Matching to CHIPS_PER_SYMBOL chips, could never have a error of CHIPS_PER_SYMBOL + 1 chips
-    int diff_dec_bit;
-    int diff_enc_bit;
+    // int diff_dec_bit;
+    // int diff_enc_bit;
 
     for( i=0; i<2; i++) {
-        // FIXME: we can store the last chip
-        // ignore the first and last chip since it depends on the last chip.
-        unsigned int threshold = gr::blocks::count_bits16(( chips & 0x3FFE ) ^ ( CHIP_MAPPING[i] & 0x3FFE ));
+        
+        
+        unsigned int threshold = gr::blocks::count_bits16(( chips & CHIP_MASK ) ^ ( CHIP_MAPPING[i] & CHIP_MASK ));
 
         if ( threshold < min_threshold ) {
             best_match    = i;
@@ -109,11 +109,6 @@ unsigned char decode_chips( unsigned short chips ){
             d_lqi += CHIPS_PER_SYMBOL - min_threshold;
             d_lqi_sample_count++;
         }
-
-        diff_dec_bit        = best_match ^ d_last_diff_enc_bit;
-        d_last_diff_enc_bit = best_match;
-        best_match          = diff_dec_bit;
-
 
         return (unsigned char) best_match & 0x01 ;
     }
@@ -134,10 +129,9 @@ bpsk_packet_sink_impl( int threshold )
 
     if ( VERBOSITY > 0 )
         fprintf( stderr, "syncvec: %x, threshold: %d\n", d_sync_vector, d_threshold ),fflush( stderr );
+
     enter_search();
-
     message_port_register_out( pmt::mp("out"));
-
 }
 
 ~bpsk_packet_sink_impl()
@@ -150,11 +144,12 @@ int general_work(   int                         noutput,
                     gr_vector_void_star&        output_items )
 {
 
-    const unsigned char *inbuf = ( const unsigned char*)input_items[0];
-    int                 ninput = ninput_items[0];
-    int                 count  = 0;
-    int                 i      = 0;
-    int                 rx_bit = 0;
+    const unsigned char *inbuf       = ( const unsigned char*)input_items[0];
+    int                 ninput       = ninput_items[0];
+    int                 count        = 0;
+    int                 i            = 0;
+    int                 rx_bit       = 0;
+    int                 diff_dec_bit = 0;                 
 
     if ( VERBOSITY > 0 )
         fprintf( stderr,">>> Entering state machine\n"),fflush( stderr );
@@ -183,7 +178,7 @@ int general_work(   int                         noutput,
 
                     if ( rx_bit == 0 ) {
                         if ( VERBOSITY > 1 )
-                            fprintf( stderr,"Found 0 in chip sequence\n"),fflush( stderr );
+                            fprintf( stderr,"Found 0 in chip sequence\n"), fflush( stderr );
                         d_preamble_cnt += 1;  // we found a 0 in the chip sequence
                     }
                 } else {
@@ -192,11 +187,15 @@ int general_work(   int                         noutput,
                         d_chip_cnt = 0;
                         
                         rx_bit = decode_chips( d_shift_reg );
-                        
+                                                
                         if ( rx_bit == 0xFF ) {
                             enter_search();
                             break;
                         }
+                        
+                        diff_dec_bit        = rx_bit ^ d_last_diff_enc_bit;
+                        d_last_diff_enc_bit = rx_bit;
+                        rx_bit              = diff_dec_bit;
                         
                         if ( rx_bit == 0 ) {
                             d_preamble_cnt += 1;
@@ -243,6 +242,10 @@ int general_work(   int                         noutput,
                         break;
                     }
                     
+                    diff_dec_bit        = rx_bit ^ d_last_diff_enc_bit;
+                    d_last_diff_enc_bit = rx_bit;
+                    rx_bit              = diff_dec_bit;
+                    
                     d_packet_byte = (d_packet_byte >> 1) | (rx_bit << 7);
                     d_packet_byte_bit_count += 1;
                     
@@ -281,7 +284,11 @@ int general_work(   int                         noutput,
                         enter_search();
                         break;
                     }
-
+                    
+                    diff_dec_bit        = rx_bit ^ d_last_diff_enc_bit;
+                    d_last_diff_enc_bit = rx_bit;
+                    rx_bit              = diff_dec_bit;
+                    
                     d_packet_byte = (d_packet_byte >> 1) | (rx_bit << 7);
                     d_packet_byte_bit_count += 1;
 
