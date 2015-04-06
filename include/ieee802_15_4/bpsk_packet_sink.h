@@ -28,7 +28,10 @@ class IEEE802_15_4_API bpsk_packet_sink : virtual public block
 public:
 
 	typedef boost::shared_ptr<bpsk_packet_sink> sptr;
-	static sptr make(unsigned int threshold = 10);
+
+	static  sptr    make( int threshold );
+    virtual void    set_threshold( int threshold ) = 0;
+    virtual int     threshold() = 0;
 
 };
 

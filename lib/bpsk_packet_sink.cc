@@ -41,8 +41,22 @@ static const int          MAX_LQI_SAMPLES = 8;                  // Number of chi
 class bpsk_packet_sink_impl : public bpsk_packet_sink {
 public:
 
+int
+threshold()
+{
+    return d_threshold;
+}
 
-void set_state( int state )
+void
+set_threshold( int threshold )
+{
+    if ( VERBOSITY > 0 )
+        fprintf( stderr, "Setting threshold to %d", threshold ), fflush( stderr );
+    d_threshold = threshold;
+}
+
+void
+set_state( int state )
 {
     switch( state ) {
     case STATE_SYNC_SEARCH:
@@ -73,7 +87,8 @@ void set_state( int state )
 }
 
 
-unsigned char decode_chips( unsigned short chips ){
+unsigned char
+decode_chips( unsigned short chips ){
     unsigned char i;
     unsigned char chip_errors;
     unsigned char min_chip_errors = CHIPS_PER_SYMBOL + 1; // Matching to CHIPS_PER_SYMBOL chips, could never have a error of CHIPS_PER_SYMBOL + 1 chips
@@ -108,9 +123,9 @@ unsigned char decode_chips( unsigned short chips ){
 bpsk_packet_sink_impl( int threshold )
   : block ("bpsk_packet_sink",
            gr::io_signature::make( 1, 1, sizeof( unsigned char )),
-           gr::io_signature::make( 0, 0, 0 )),
-           d_threshold( threshold )
+           gr::io_signature::make( 0, 0, 0 ))
 {
+    set_threshold( threshold );
     d_sync_vector      = 0xA7;
     d_lqi              = 0;
     d_lqi_sample_count = 0;
@@ -126,10 +141,11 @@ bpsk_packet_sink_impl( int threshold )
 {
 }
 
-int general_work(   int                         noutput,
-                    gr_vector_int&              ninput_items,
-                    gr_vector_const_void_star&  input_items,
-                    gr_vector_void_star&        output_items )
+int
+general_work( int                         noutput,
+              gr_vector_int&              ninput_items,
+              gr_vector_const_void_star&  input_items,
+              gr_vector_void_star&        output_items )
 {
 
     const unsigned char *inbuf       = ( const unsigned char*)input_items[0];
@@ -327,7 +343,7 @@ private:
     enum {STATE_SYNC_SEARCH, STATE_HEADER_SEARCH, STATE_PAYLOAD_COLLECT} d_state;
 
     unsigned int      d_sync_vector;           // 802.15.4 standard is 4x 0 bytes and 1x0xA7
-    unsigned int      d_threshold;             // how many bits may be wrong in sync vector
+    int               d_threshold;             // how many bits may be wrong in sync vector
 
     unsigned int      d_shift_reg;             // used to look for sync_vector
     int               d_preamble_cnt;          // count on where we are in preamble
@@ -350,6 +366,6 @@ private:
     char              buf[256];                // FIXME:
 };
 
-bpsk_packet_sink::sptr bpsk_packet_sink::make( unsigned int threshold ) {
+bpsk_packet_sink::sptr bpsk_packet_sink::make( int threshold ) {
     return gnuradio::get_initial_sptr( new bpsk_packet_sink_impl( threshold ));
 }

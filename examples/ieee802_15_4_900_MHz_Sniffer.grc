@@ -6,7 +6,7 @@
     <key>options</key>
     <param>
       <key>id</key>
-      <value>ieee_802_5_4_900mhz_bpsk_sniffer</value>
+      <value>ieee802_15_4_900MHz_sniffer</value>
     </param>
     <param>
       <key>_enabled</key>
@@ -14,7 +14,7 @@
     </param>
     <param>
       <key>title</key>
-      <value>IEEE 802.15.4 900 NHz BPSK Sniffer</value>
+      <value>IEEE 802.15.4 900 MHz BPSK Sniffer</value>
     </param>
     <param>
       <key>author</key>
@@ -22,11 +22,11 @@
     </param>
     <param>
       <key>description</key>
-      <value>IEEE 802.15.4 900 NHz BPSK Sniffer</value>
+      <value></value>
     </param>
     <param>
       <key>window_size</key>
-      <value>2000, 1024</value>
+      <value>1900, 1024</value>
     </param>
     <param>
       <key>generate_options</key>
@@ -96,33 +96,6 @@
     <key>variable</key>
     <param>
       <key>id</key>
-      <value>rrc_taps</value>
-    </param>
-    <param>
-      <key>_enabled</key>
-      <value>True</value>
-    </param>
-    <param>
-      <key>value</key>
-      <value>filter.firdes.root_raised_cosine( 4, 4, 1.0, .35, 11*32)</value>
-    </param>
-    <param>
-      <key>alias</key>
-      <value></value>
-    </param>
-    <param>
-      <key>_coordinate</key>
-      <value>(448, 23)</value>
-    </param>
-    <param>
-      <key>_rotation</key>
-      <value>0</value>
-    </param>
-  </block>
-  <block>
-    <key>variable</key>
-    <param>
-      <key>id</key>
       <value>tune_freq</value>
     </param>
     <param>
@@ -150,7 +123,7 @@
     <key>variable</key>
     <param>
       <key>id</key>
-      <value>samp_rate</value>
+      <value>rrc_taps</value>
     </param>
     <param>
       <key>_enabled</key>
@@ -158,7 +131,7 @@
     </param>
     <param>
       <key>value</key>
-      <value>2.4e6</value>
+      <value>filter.firdes.root_raised_cosine( 4, 4, 1.0, .35, 11*32)</value>
     </param>
     <param>
       <key>alias</key>
@@ -166,7 +139,7 @@
     </param>
     <param>
       <key>_coordinate</key>
-      <value>(40, 135)</value>
+      <value>(448, 23)</value>
     </param>
     <param>
       <key>_rotation</key>
@@ -185,7 +158,7 @@
     </param>
     <param>
       <key>value</key>
-      <value>3</value>
+      <value>-samp_rate*oversampling/4</value>
     </param>
     <param>
       <key>alias</key>
@@ -201,50 +174,53 @@
     </param>
   </block>
   <block>
-    <key>blocks_file_source</key>
+    <key>variable</key>
     <param>
       <key>id</key>
-      <value>blocks_file_source_0</value>
+      <value>translate_taps</value>
     </param>
     <param>
       <key>_enabled</key>
       <value>True</value>
     </param>
     <param>
-      <key>file</key>
-      <value>/Users/jay/ieee802-15-4_BPSK_Packes_2.4MHz.dat</value>
-    </param>
-    <param>
-      <key>type</key>
-      <value>complex</value>
-    </param>
-    <param>
-      <key>repeat</key>
-      <value>True</value>
-    </param>
-    <param>
-      <key>vlen</key>
-      <value>1</value>
+      <key>value</key>
+      <value>firdes.low_pass(1, samp_rate*oversampling,  samp_rate*0.9/2, samp_rate*0.5/2, firdes.WIN_HAMMING, 6.76)</value>
     </param>
     <param>
       <key>alias</key>
       <value></value>
     </param>
     <param>
-      <key>affinity</key>
+      <key>_coordinate</key>
+      <value>(264, 151)</value>
+    </param>
+    <param>
+      <key>_rotation</key>
+      <value>0</value>
+    </param>
+  </block>
+  <block>
+    <key>variable</key>
+    <param>
+      <key>id</key>
+      <value>samp_rate</value>
+    </param>
+    <param>
+      <key>_enabled</key>
+      <value>True</value>
+    </param>
+    <param>
+      <key>value</key>
+      <value>2.4e6</value>
+    </param>
+    <param>
+      <key>alias</key>
       <value></value>
     </param>
     <param>
-      <key>minoutbuf</key>
-      <value>0</value>
-    </param>
-    <param>
-      <key>maxoutbuf</key>
-      <value>0</value>
-    </param>
-    <param>
       <key>_coordinate</key>
-      <value>(16, 519)</value>
+      <value>(40, 135)</value>
     </param>
     <param>
       <key>_rotation</key>
@@ -402,6 +378,53 @@
     </param>
   </block>
   <block>
+    <key>variable_constellation</key>
+    <param>
+      <key>id</key>
+      <value>bpsk_const</value>
+    </param>
+    <param>
+      <key>_enabled</key>
+      <value>True</value>
+    </param>
+    <param>
+      <key>sym_map</key>
+      <value>[0,1]</value>
+    </param>
+    <param>
+      <key>const_points</key>
+      <value>const_symbols</value>
+    </param>
+    <param>
+      <key>rot_sym</key>
+      <value>4</value>
+    </param>
+    <param>
+      <key>dims</key>
+      <value>1</value>
+    </param>
+    <param>
+      <key>precision</key>
+      <value>8</value>
+    </param>
+    <param>
+      <key>soft_dec_lut</key>
+      <value>None</value>
+    </param>
+    <param>
+      <key>alias</key>
+      <value></value>
+    </param>
+    <param>
+      <key>_coordinate</key>
+      <value>(592, 19)</value>
+    </param>
+    <param>
+      <key>_rotation</key>
+      <value>0</value>
+    </param>
+  </block>
+  <block>
     <key>import</key>
     <param>
       <key>id</key>
@@ -429,6 +452,261 @@
     </param>
   </block>
   <block>
+    <key>freq_xlating_fir_filter_xxx</key>
+    <param>
+      <key>id</key>
+      <value>freq_xlating_fir_filter_xxx_0</value>
+    </param>
+    <param>
+      <key>_enabled</key>
+      <value>True</value>
+    </param>
+    <param>
+      <key>type</key>
+      <value>ccc</value>
+    </param>
+    <param>
+      <key>decim</key>
+      <value>int(oversampling)</value>
+    </param>
+    <param>
+      <key>taps</key>
+      <value>translate_taps</value>
+    </param>
+    <param>
+      <key>center_freq</key>
+      <value>-freq_shift</value>
+    </param>
+    <param>
+      <key>samp_rate</key>
+      <value>samp_rate*oversampling</value>
+    </param>
+    <param>
+      <key>alias</key>
+      <value></value>
+    </param>
+    <param>
+      <key>affinity</key>
+      <value></value>
+    </param>
+    <param>
+      <key>minoutbuf</key>
+      <value>0</value>
+    </param>
+    <param>
+      <key>maxoutbuf</key>
+      <value>0</value>
+    </param>
+    <param>
+      <key>_coordinate</key>
+      <value>(256, 266)</value>
+    </param>
+    <param>
+      <key>_rotation</key>
+      <value>0</value>
+    </param>
+  </block>
+  <block>
+    <key>blks2_selector</key>
+    <param>
+      <key>id</key>
+      <value>blks2_selector_0</value>
+    </param>
+    <param>
+      <key>_enabled</key>
+      <value>True</value>
+    </param>
+    <param>
+      <key>type</key>
+      <value>complex</value>
+    </param>
+    <param>
+      <key>num_inputs</key>
+      <value>2</value>
+    </param>
+    <param>
+      <key>num_outputs</key>
+      <value>1</value>
+    </param>
+    <param>
+      <key>input_index</key>
+      <value>0 if rf_source == 0 else 1</value>
+    </param>
+    <param>
+      <key>output_index</key>
+      <value>0</value>
+    </param>
+    <param>
+      <key>vlen</key>
+      <value>1</value>
+    </param>
+    <param>
+      <key>alias</key>
+      <value></value>
+    </param>
+    <param>
+      <key>affinity</key>
+      <value></value>
+    </param>
+    <param>
+      <key>minoutbuf</key>
+      <value>0</value>
+    </param>
+    <param>
+      <key>maxoutbuf</key>
+      <value>0</value>
+    </param>
+    <param>
+      <key>_coordinate</key>
+      <value>(456, 439)</value>
+    </param>
+    <param>
+      <key>_rotation</key>
+      <value>0</value>
+    </param>
+  </block>
+  <block>
+    <key>blocks_pdu_to_tagged_stream</key>
+    <param>
+      <key>id</key>
+      <value>blocks_pdu_to_tagged_stream_0</value>
+    </param>
+    <param>
+      <key>_enabled</key>
+      <value>True</value>
+    </param>
+    <param>
+      <key>type</key>
+      <value>byte</value>
+    </param>
+    <param>
+      <key>tag</key>
+      <value>packet_len</value>
+    </param>
+    <param>
+      <key>alias</key>
+      <value></value>
+    </param>
+    <param>
+      <key>affinity</key>
+      <value></value>
+    </param>
+    <param>
+      <key>minoutbuf</key>
+      <value>0</value>
+    </param>
+    <param>
+      <key>maxoutbuf</key>
+      <value>0</value>
+    </param>
+    <param>
+      <key>_coordinate</key>
+      <value>(1128, 463)</value>
+    </param>
+    <param>
+      <key>_rotation</key>
+      <value>0</value>
+    </param>
+  </block>
+  <block>
+    <key>blocks_file_source</key>
+    <param>
+      <key>id</key>
+      <value>blocks_file_source_0</value>
+    </param>
+    <param>
+      <key>_enabled</key>
+      <value>True</value>
+    </param>
+    <param>
+      <key>file</key>
+      <value>/ieee802-15-4_BPSK_Packes_2.4MHz.dat</value>
+    </param>
+    <param>
+      <key>type</key>
+      <value>complex</value>
+    </param>
+    <param>
+      <key>repeat</key>
+      <value>True</value>
+    </param>
+    <param>
+      <key>vlen</key>
+      <value>1</value>
+    </param>
+    <param>
+      <key>alias</key>
+      <value></value>
+    </param>
+    <param>
+      <key>affinity</key>
+      <value></value>
+    </param>
+    <param>
+      <key>minoutbuf</key>
+      <value>0</value>
+    </param>
+    <param>
+      <key>maxoutbuf</key>
+      <value>0</value>
+    </param>
+    <param>
+      <key>_coordinate</key>
+      <value>(16, 519)</value>
+    </param>
+    <param>
+      <key>_rotation</key>
+      <value>0</value>
+    </param>
+  </block>
+  <block>
+    <key>ieee_802_5_4_bpsk_rx_phy</key>
+    <param>
+      <key>id</key>
+      <value>ieee_802_5_4_bpsk_rx_phy_0</value>
+    </param>
+    <param>
+      <key>_enabled</key>
+      <value>True</value>
+    </param>
+    <param>
+      <key>samp_rate</key>
+      <value>samp_rate</value>
+    </param>
+    <param>
+      <key>constellation_points</key>
+      <value>[ 1+0j, -1+0j ]</value>
+    </param>
+    <param>
+      <key>threshold</key>
+      <value>chip_error_threshold</value>
+    </param>
+    <param>
+      <key>alias</key>
+      <value></value>
+    </param>
+    <param>
+      <key>affinity</key>
+      <value></value>
+    </param>
+    <param>
+      <key>minoutbuf</key>
+      <value>0</value>
+    </param>
+    <param>
+      <key>maxoutbuf</key>
+      <value>0</value>
+    </param>
+    <param>
+      <key>_coordinate</key>
+      <value>(855, 451)</value>
+    </param>
+    <param>
+      <key>_rotation</key>
+      <value>0</value>
+    </param>
+  </block>
+  <block>
     <key>qtgui_tab_widget</key>
     <param>
       <key>id</key>
@@ -440,7 +718,7 @@
     </param>
     <param>
       <key>num_tabs</key>
-      <value>3</value>
+      <value>2</value>
     </param>
     <param>
       <key>label0</key>
@@ -448,7 +726,7 @@
     </param>
     <param>
       <key>label1</key>
-      <value>Constellation</value>
+      <value>Setup</value>
     </param>
     <param>
       <key>label2</key>
@@ -543,84 +821,6 @@
     <key>variable_qtgui_entry</key>
     <param>
       <key>id</key>
-      <value>rx_mu</value>
-    </param>
-    <param>
-      <key>_enabled</key>
-      <value>True</value>
-    </param>
-    <param>
-      <key>label</key>
-      <value>Mu (default 0.25)</value>
-    </param>
-    <param>
-      <key>type</key>
-      <value>real</value>
-    </param>
-    <param>
-      <key>value</key>
-      <value>.25</value>
-    </param>
-    <param>
-      <key>gui_hint</key>
-      <value>tabs@2:0,1,1,1</value>
-    </param>
-    <param>
-      <key>alias</key>
-      <value></value>
-    </param>
-    <param>
-      <key>_coordinate</key>
-      <value>(872, 88)</value>
-    </param>
-    <param>
-      <key>_rotation</key>
-      <value>0</value>
-    </param>
-  </block>
-  <block>
-    <key>variable_qtgui_entry</key>
-    <param>
-      <key>id</key>
-      <value>balderf_rxvga</value>
-    </param>
-    <param>
-      <key>_enabled</key>
-      <value>True</value>
-    </param>
-    <param>
-      <key>label</key>
-      <value>RX VGA Gain (5-30)</value>
-    </param>
-    <param>
-      <key>type</key>
-      <value>int</value>
-    </param>
-    <param>
-      <key>value</key>
-      <value>10</value>
-    </param>
-    <param>
-      <key>gui_hint</key>
-      <value>tabs@2:0,2,1,1</value>
-    </param>
-    <param>
-      <key>alias</key>
-      <value></value>
-    </param>
-    <param>
-      <key>_coordinate</key>
-      <value>(864, 208)</value>
-    </param>
-    <param>
-      <key>_rotation</key>
-      <value>0</value>
-    </param>
-  </block>
-  <block>
-    <key>variable_qtgui_entry</key>
-    <param>
-      <key>id</key>
       <value>const_points</value>
     </param>
     <param>
@@ -641,7 +841,7 @@
     </param>
     <param>
       <key>gui_hint</key>
-      <value>tabs@2</value>
+      <value>tabs@1</value>
     </param>
     <param>
       <key>alias</key>
@@ -680,7 +880,7 @@
     </param>
     <param>
       <key>gui_hint</key>
-      <value>tabs@2</value>
+      <value>tabs@1</value>
     </param>
     <param>
       <key>alias</key>
@@ -696,38 +896,30 @@
     </param>
   </block>
   <block>
-    <key>variable_constellation</key>
+    <key>variable_qtgui_entry</key>
     <param>
       <key>id</key>
-      <value>bpsk_const</value>
+      <value>rx_mu</value>
     </param>
     <param>
       <key>_enabled</key>
       <value>True</value>
     </param>
     <param>
-      <key>sym_map</key>
-      <value>[0,1]</value>
+      <key>label</key>
+      <value>Mu (default 0.25)</value>
     </param>
     <param>
-      <key>const_points</key>
-      <value>const_symbols</value>
+      <key>type</key>
+      <value>real</value>
     </param>
     <param>
-      <key>rot_sym</key>
-      <value>4</value>
+      <key>value</key>
+      <value>.25</value>
     </param>
     <param>
-      <key>dims</key>
-      <value>1</value>
-    </param>
-    <param>
-      <key>precision</key>
-      <value>8</value>
-    </param>
-    <param>
-      <key>soft_dec_lut</key>
-      <value>None</value>
+      <key>gui_hint</key>
+      <value>tabs@1:0,1,1,1</value>
     </param>
     <param>
       <key>alias</key>
@@ -735,7 +927,46 @@
     </param>
     <param>
       <key>_coordinate</key>
-      <value>(592, 19)</value>
+      <value>(872, 88)</value>
+    </param>
+    <param>
+      <key>_rotation</key>
+      <value>0</value>
+    </param>
+  </block>
+  <block>
+    <key>variable_qtgui_entry</key>
+    <param>
+      <key>id</key>
+      <value>freq_correction_hz</value>
+    </param>
+    <param>
+      <key>_enabled</key>
+      <value>True</value>
+    </param>
+    <param>
+      <key>label</key>
+      <value>Frequency Correction (Hz)</value>
+    </param>
+    <param>
+      <key>type</key>
+      <value>real</value>
+    </param>
+    <param>
+      <key>value</key>
+      <value>-10000</value>
+    </param>
+    <param>
+      <key>gui_hint</key>
+      <value>tabs@1</value>
+    </param>
+    <param>
+      <key>alias</key>
+      <value></value>
+    </param>
+    <param>
+      <key>_coordinate</key>
+      <value>(868, 276)</value>
     </param>
     <param>
       <key>_rotation</key>
@@ -766,7 +997,7 @@
     </param>
     <param>
       <key>value</key>
-      <value>5</value>
+      <value>9</value>
     </param>
     <param>
       <key>options</key>
@@ -835,198 +1066,6 @@
     <param>
       <key>_coordinate</key>
       <value>(1296, 17)</value>
-    </param>
-    <param>
-      <key>_rotation</key>
-      <value>0</value>
-    </param>
-  </block>
-  <block>
-    <key>blks2_selector</key>
-    <param>
-      <key>id</key>
-      <value>blks2_selector_0</value>
-    </param>
-    <param>
-      <key>_enabled</key>
-      <value>True</value>
-    </param>
-    <param>
-      <key>type</key>
-      <value>complex</value>
-    </param>
-    <param>
-      <key>num_inputs</key>
-      <value>2</value>
-    </param>
-    <param>
-      <key>num_outputs</key>
-      <value>1</value>
-    </param>
-    <param>
-      <key>input_index</key>
-      <value>0 if rf_source == 0 else 1</value>
-    </param>
-    <param>
-      <key>output_index</key>
-      <value>0</value>
-    </param>
-    <param>
-      <key>vlen</key>
-      <value>1</value>
-    </param>
-    <param>
-      <key>alias</key>
-      <value></value>
-    </param>
-    <param>
-      <key>affinity</key>
-      <value></value>
-    </param>
-    <param>
-      <key>minoutbuf</key>
-      <value>0</value>
-    </param>
-    <param>
-      <key>maxoutbuf</key>
-      <value>0</value>
-    </param>
-    <param>
-      <key>_coordinate</key>
-      <value>(456, 439)</value>
-    </param>
-    <param>
-      <key>_rotation</key>
-      <value>0</value>
-    </param>
-  </block>
-  <block>
-    <key>zeromq_push_sink</key>
-    <param>
-      <key>id</key>
-      <value>zeromq_push_sink_0</value>
-    </param>
-    <param>
-      <key>_enabled</key>
-      <value>True</value>
-    </param>
-    <param>
-      <key>type</key>
-      <value>byte</value>
-    </param>
-    <param>
-      <key>vlen</key>
-      <value>1</value>
-    </param>
-    <param>
-      <key>address</key>
-      <value>tcp://127.0.0.1:5555</value>
-    </param>
-    <param>
-      <key>timeout</key>
-      <value>100</value>
-    </param>
-    <param>
-      <key>alias</key>
-      <value></value>
-    </param>
-    <param>
-      <key>affinity</key>
-      <value></value>
-    </param>
-    <param>
-      <key>_coordinate</key>
-      <value>(1312, 471)</value>
-    </param>
-    <param>
-      <key>_rotation</key>
-      <value>0</value>
-    </param>
-  </block>
-  <block>
-    <key>ieee_802_5_4_bpsk_rx_phy</key>
-    <param>
-      <key>id</key>
-      <value>ieee_802_5_4_bpsk_rx_phy_0</value>
-    </param>
-    <param>
-      <key>_enabled</key>
-      <value>True</value>
-    </param>
-    <param>
-      <key>samp_rate</key>
-      <value>samp_rate</value>
-    </param>
-    <param>
-      <key>constellation_points</key>
-      <value>[ 1+0j, -1+0j ]</value>
-    </param>
-    <param>
-      <key>parameter_0</key>
-      <value>0</value>
-    </param>
-    <param>
-      <key>alias</key>
-      <value></value>
-    </param>
-    <param>
-      <key>affinity</key>
-      <value></value>
-    </param>
-    <param>
-      <key>minoutbuf</key>
-      <value>0</value>
-    </param>
-    <param>
-      <key>maxoutbuf</key>
-      <value>0</value>
-    </param>
-    <param>
-      <key>_coordinate</key>
-      <value>(697, 443)</value>
-    </param>
-    <param>
-      <key>_rotation</key>
-      <value>0</value>
-    </param>
-  </block>
-  <block>
-    <key>blocks_pdu_to_tagged_stream</key>
-    <param>
-      <key>id</key>
-      <value>blocks_pdu_to_tagged_stream_0</value>
-    </param>
-    <param>
-      <key>_enabled</key>
-      <value>True</value>
-    </param>
-    <param>
-      <key>type</key>
-      <value>byte</value>
-    </param>
-    <param>
-      <key>tag</key>
-      <value>packet_len</value>
-    </param>
-    <param>
-      <key>alias</key>
-      <value></value>
-    </param>
-    <param>
-      <key>affinity</key>
-      <value></value>
-    </param>
-    <param>
-      <key>minoutbuf</key>
-      <value>0</value>
-    </param>
-    <param>
-      <key>maxoutbuf</key>
-      <value>0</value>
-    </param>
-    <param>
-      <key>_coordinate</key>
-      <value>(1023, 457)</value>
     </param>
     <param>
       <key>_rotation</key>
@@ -1129,11 +1168,11 @@
     </param>
     <param>
       <key>sample_rate</key>
-      <value>samp_rate</value>
+      <value>samp_rate*oversampling</value>
     </param>
     <param>
       <key>freq0</key>
-      <value>tune_freq</value>
+      <value>tune_freq+freq_shift+freq_correction_hz</value>
     </param>
     <param>
       <key>corr0</key>
@@ -2437,6 +2476,127 @@
     </param>
   </block>
   <block>
+    <key>zeromq_push_sink</key>
+    <param>
+      <key>id</key>
+      <value>zeromq_push_sink_0</value>
+    </param>
+    <param>
+      <key>_enabled</key>
+      <value>True</value>
+    </param>
+    <param>
+      <key>type</key>
+      <value>byte</value>
+    </param>
+    <param>
+      <key>vlen</key>
+      <value>1</value>
+    </param>
+    <param>
+      <key>address</key>
+      <value>tcp://127.0.0.1:5555</value>
+    </param>
+    <param>
+      <key>timeout</key>
+      <value>2</value>
+    </param>
+    <param>
+      <key>alias</key>
+      <value></value>
+    </param>
+    <param>
+      <key>affinity</key>
+      <value></value>
+    </param>
+    <param>
+      <key>_coordinate</key>
+      <value>(1381, 453)</value>
+    </param>
+    <param>
+      <key>_rotation</key>
+      <value>0</value>
+    </param>
+  </block>
+  <block>
+    <key>variable_qtgui_entry</key>
+    <param>
+      <key>id</key>
+      <value>balderf_rxvga</value>
+    </param>
+    <param>
+      <key>_enabled</key>
+      <value>True</value>
+    </param>
+    <param>
+      <key>label</key>
+      <value>RX VGA Gain (5-30)</value>
+    </param>
+    <param>
+      <key>type</key>
+      <value>int</value>
+    </param>
+    <param>
+      <key>value</key>
+      <value>5</value>
+    </param>
+    <param>
+      <key>gui_hint</key>
+      <value>tabs@1:0,2,1,1</value>
+    </param>
+    <param>
+      <key>alias</key>
+      <value></value>
+    </param>
+    <param>
+      <key>_coordinate</key>
+      <value>(864, 208)</value>
+    </param>
+    <param>
+      <key>_rotation</key>
+      <value>0</value>
+    </param>
+  </block>
+  <block>
+    <key>variable_qtgui_entry</key>
+    <param>
+      <key>id</key>
+      <value>chip_error_threshold</value>
+    </param>
+    <param>
+      <key>_enabled</key>
+      <value>True</value>
+    </param>
+    <param>
+      <key>label</key>
+      <value>Chip Error Threshold</value>
+    </param>
+    <param>
+      <key>type</key>
+      <value>int</value>
+    </param>
+    <param>
+      <key>value</key>
+      <value>5</value>
+    </param>
+    <param>
+      <key>gui_hint</key>
+      <value>tabs@1</value>
+    </param>
+    <param>
+      <key>alias</key>
+      <value></value>
+    </param>
+    <param>
+      <key>_coordinate</key>
+      <value>(612, 295)</value>
+    </param>
+    <param>
+      <key>_rotation</key>
+      <value>0</value>
+    </param>
+  </block>
+  <block>
     <key>fosphor_qt_sink_c</key>
     <param>
       <key>id</key>
@@ -2452,7 +2612,7 @@
     </param>
     <param>
       <key>freq_center</key>
-      <value>0</value>
+      <value>tune_freq</value>
     </param>
     <param>
       <key>freq_span</key>
@@ -2472,7 +2632,7 @@
     </param>
     <param>
       <key>_coordinate</key>
-      <value>(457, 318)</value>
+      <value>(632, 519)</value>
     </param>
     <param>
       <key>_rotation</key>
@@ -2486,12 +2646,6 @@
     <sink_key>0</sink_key>
   </connection>
   <connection>
-    <source_block_id>osmosdr_source_0</source_block_id>
-    <sink_block_id>blks2_selector_0</sink_block_id>
-    <source_key>0</source_key>
-    <sink_key>0</sink_key>
-  </connection>
-  <connection>
     <source_block_id>blocks_throttle_0</source_block_id>
     <sink_block_id>blks2_selector_0</sink_block_id>
     <source_key>0</source_key>
@@ -2499,13 +2653,25 @@
   </connection>
   <connection>
     <source_block_id>blks2_selector_0</source_block_id>
-    <sink_block_id>ieee_802_5_4_bpsk_rx_phy_0</sink_block_id>
+    <sink_block_id>fosphor_qt_sink_c_0</sink_block_id>
     <source_key>0</source_key>
     <sink_key>0</sink_key>
   </connection>
   <connection>
-    <source_block_id>blocks_pdu_to_tagged_stream_0</source_block_id>
-    <sink_block_id>zeromq_push_sink_0</sink_block_id>
+    <source_block_id>osmosdr_source_0</source_block_id>
+    <sink_block_id>freq_xlating_fir_filter_xxx_0</sink_block_id>
+    <source_key>0</source_key>
+    <sink_key>0</sink_key>
+  </connection>
+  <connection>
+    <source_block_id>freq_xlating_fir_filter_xxx_0</source_block_id>
+    <sink_block_id>blks2_selector_0</sink_block_id>
+    <source_key>0</source_key>
+    <sink_key>0</sink_key>
+  </connection>
+  <connection>
+    <source_block_id>blks2_selector_0</source_block_id>
+    <sink_block_id>ieee_802_5_4_bpsk_rx_phy_0</sink_block_id>
     <source_key>0</source_key>
     <sink_key>0</sink_key>
   </connection>
@@ -2516,8 +2682,8 @@
     <sink_key>pdus</sink_key>
   </connection>
   <connection>
-    <source_block_id>osmosdr_source_0</source_block_id>
-    <sink_block_id>fosphor_qt_sink_c_0</sink_block_id>
+    <source_block_id>blocks_pdu_to_tagged_stream_0</source_block_id>
+    <sink_block_id>zeromq_push_sink_0</sink_block_id>
     <source_key>0</source_key>
     <sink_key>0</sink_key>
   </connection>
